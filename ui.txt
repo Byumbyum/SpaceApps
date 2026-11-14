@@ -1,0 +1,33 @@
+User flow modes
+Free roam
+In the centre, there is this 3D globe that can be rotated. The whole global is greyed out except for the active area that we have data for. This active area lies within the 4 latitude and longitude points:
+73, -176
+73, -124
+50, -124
+50, -176
+
+Datapoint selection (left side of screen): only data points that fall within the area of interest and the selected timeframe will be analysed.
+On the left side, there is a vertical toolbar with 3 options that controls what the cursor can do:
+Option 1: do nothing, used to navigate
+Option 2: select area of interest using a scalable paintbrush
+Option 3: deselect area of interest using a scalable paintbrush
+
+Below this toolbar, there is another vertical toolbar that controls the timeframe of analysis.
+Time selection: select a start and end year
+Season selection: select the season (spring, summer, autumn, winter), multiple selections are possible
+
+Data analysis (right side of screen)
+On the right side of the screen, there is a scrollable sidebar that analysing the data that pertains to the selected area.
+At the top, the feature of analysis can be selected (NISAR magnitude, temperature, ground sink rate etc.). Specific NISAR bands (L-band, S-band, etc.) can be filtered. Multiple features can be selected for analysis at once
+
+The following data visualisation will be shown:
+Graph of each data feature’s average magnitude over time. 
+Geographic heatmap of data features.
+
+The following data analysis will be shown. Code it so that we can easily modify the way we generate the confidence scores:
+Confidence score of risk of permafrost melt to infrastructure
+Confidence score of long term risk of reaching a tipping point
+
+More visualisation or analysis modes may be added later. Plan for this.
+
+

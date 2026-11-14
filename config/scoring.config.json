@@ -1,0 +1,141 @@
+{
+  "version": "2026.11-demo.1",
+  "epsilon": 0.01,
+  "bands": { "high": 0.75, "medium": 0.5 },
+  "hard_exclusions": [
+    { "id": "open_water", "label": "Mostly open water" },
+    { "id": "snow", "label": "Snow or freeze–thaw contamination" },
+    { "id": "invalid_phase", "label": "Missing or disconnected unwrapped phase" },
+    { "id": "low_coherence", "label": "Radar coherence below 0.30" },
+    { "id": "geometry", "label": "Severe layover or unsupported motion geometry" },
+    { "id": "insufficient_observations", "label": "Insufficient valid observations" }
+  ],
+  "factors": [
+    {
+      "id": "coherence",
+      "label": "Radar coherence",
+      "source_dataset": "NISAR GUNW / OPERA DISP-S1",
+      "transform": "linear_rescale",
+      "params": { "min": 0.3, "max": 0.7 },
+      "weight": 0.24,
+      "index": "Q",
+      "explanation": "How consistently the radar phase is preserved between acquisitions."
+    },
+    {
+      "id": "valid_pair_share",
+      "label": "Valid pair coverage",
+      "source_dataset": "Acquisition inventory",
+      "transform": "identity",
+      "params": {},
+      "weight": 0.18,
+      "index": "Q",
+      "explanation": "The share of expected snow-free radar pairs that passed screening."
+    },
+    {
+      "id": "reference_stability",
+      "label": "Reference stability",
+      "source_dataset": "Reference-area diagnostics",
+      "transform": "identity",
+      "params": {},
+      "weight": 0.16,
+      "index": "Q",
+      "explanation": "Whether the comparison ground remains internally consistent through time."
+    },
+    {
+      "id": "temporal_consistency",
+      "label": "Temporal consistency",
+      "source_dataset": "Overlapping interferograms",
+      "transform": "identity",
+      "params": {},
+      "weight": 0.16,
+      "index": "Q",
+      "explanation": "Whether overlapping radar pairs tell a compatible motion story."
+    },
+    {
+      "id": "correction_magnitude_cm",
+      "label": "Correction burden",
+      "source_dataset": "GUNW ionosphere / atmosphere / tide layers",
+      "transform": "inverse",
+      "params": { "scale": 2.0 },
+      "weight": 0.14,
+      "index": "Q",
+      "explanation": "Large applied corrections reduce confidence that a small residual is true motion."
+    },
+    {
+      "id": "sensor_agreement",
+      "label": "Independent radar agreement",
+      "source_dataset": "NISAR GUNW + OPERA DISP-S1",
+      "transform": "identity",
+      "params": {},
+      "weight": 0.12,
+      "index": "Q",
+      "explanation": "Agreement with Sentinel-1 where dates and footprints overlap."
+    },
+    {
+      "id": "permafrost_fraction",
+      "label": "Permafrost context",
+      "source_dataset": "ESA CCI Permafrost",
+      "transform": "identity",
+      "params": {},
+      "weight": 0.22,
+      "index": "E",
+      "explanation": "A coarse map prior, not proof of ground ice at an individual radar pixel."
+    },
+    {
+      "id": "addt_c_days",
+      "label": "Thaw-season timing",
+      "source_dataset": "ERA5-Land",
+      "transform": "one_minus_exp",
+      "params": { "scale": 50.0 },
+      "weight": 0.16,
+      "index": "E",
+      "explanation": "Accumulated summer warmth makes thaw-season movement more plausible, but does not prove its cause."
+    },
+    {
+      "id": "persistence",
+      "label": "Between-year persistence",
+      "source_dataset": "OPERA DISP-S1 comparable dates",
+      "transform": "identity",
+      "params": {},
+      "weight": 0.18,
+      "index": "E",
+      "explanation": "Whether sinking remains at comparable seasonal endpoints rather than rebounding."
+    },
+    {
+      "id": "ground_ice_or_fire_context",
+      "label": "Ground-ice or fire context",
+      "source_dataset": "Alaska permafrost maps / AICC fire perimeters",
+      "transform": "identity",
+      "params": {},
+      "weight": 0.14,
+      "index": "E",
+      "explanation": "Mapped ground ice or a known disturbance can support, but not determine, interpretation."
+    },
+    {
+      "id": "field_agreement",
+      "label": "Field evidence agreement",
+      "source_dataset": "CALM / GTN-P / available validation data",
+      "transform": "identity",
+      "params": {},
+      "weight": 0.16,
+      "index": "E",
+      "explanation": "Independent field evidence is used only where its date and footprint are comparable."
+    },
+    {
+      "id": "recent_rain_mm",
+      "label": "Recent-rain check",
+      "source_dataset": "ERA5-Land precipitation",
+      "transform": "exp_decay",
+      "params": { "scale": 18.0 },
+      "weight": 0.14,
+      "index": "E",
+      "explanation": "Recent rain can mimic or complicate radar surface changes, so more rain lowers interpretation support."
+    }
+  ],
+  "monitoring_priority": {
+    "higher_z": 2.0,
+    "moderate_z": 1.0,
+    "minimum_q": 0.5,
+    "reference_ring_m": [300, 800]
+  }
+}
