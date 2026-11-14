@@ -1,0 +1,246 @@
+# Mega prompt: NISAR permafrost ground-motion app (NASA Space Apps 2026, "Dancing with the SARs")
+
+You are a senior full-stack engineer and remote-sensing data engineer. Build the app described below: an offline Python data pipeline plus an interactive web app. Read the whole prompt before writing code. Where the UI spec and the science constraints conflict, the science constraints win (section 3 lists every resolved conflict).
+
+---
+
+## 1. Goal
+
+Build an open-source interactive web app that uses NASA-ISRO NISAR radar data to show ground movement in Arctic Alaska, explains what it may mean for permafrost, and shows which road and pipeline sections sit near observed ground motion.
+
+**Project objective (use this wording in the app):**
+"We identify and explain radar-observed ground changes that may indicate emerging permafrost-related hazards, and show clearly which observations are trustworthy."
+
+**Audience:** policymakers and the general public, including older users. Plain language, large readable type, no jargon without a one-line explanation.
+
+**Novelty (what the app adds):** radar detecting permafrost change is established science. The app's contribution is an accessible, evidence-aware tool that brings in new NISAR observations and shows which observations are reliable enough to justify a closer look.
+
+---
+
+## 2. Science background the code must respect
+
+- **InSAR** compares the phase of two radar images taken from the same orbit position at different times. Movement along the line of sight (LOS) shifts the phase: $\Delta\phi = \frac{4\pi}{\lambda}\Delta r$. NISAR L-band has $\lambda \approx 24$ cm, so one fringe ≈ 12 cm of LOS motion.
+- InSAR measures **displacement, not thaw**. Seasonal frost heave, soil-water change, non-permafrost movement and artefacts can all appear as motion.
+- Convert LOS to vertical only where motion is plausibly vertical: $d_{vert} \approx d_{LOS}/\cos\theta$ (θ = local incidence angle from product metadata). Do not apply on steep slopes.
+- **Seasonal vs permanent:** intact ground sinks in summer and rises at freeze-up. Report (a) each summer's sinking amplitude and (b) the year-to-year residual at comparable dates separately. Never call a downward trend "permanent ice loss" as a fact; call it "consistent with" ice loss.
+- InSAR values are **relative** to a reference point and date. Always store and display the reference.
+- **Snow ruins the signal.** Thaw-season analysis uses snow-free pairs only (roughly June–September).
+- **ADDT** (accumulated degree-days of thaw) = running yearly sum of $\max(T_{air,2m}, 0)$ from ERA5-Land, reset each year. Stefan relation: thaw depth/seasonal sinking $\propto \sqrt{ADDT}$ (basis of the ReSALT method). Use it only as an **association test**. The 2024 Dalton-area study (Sadeghi Chorsi, Meyer and Dixon) found measured thaw depth correlated weakly with ADDT (R² = 0.42) at the CALM site; soil moisture, vegetation, topography, snow and ground ice also matter.
+
+### NISAR data status (as of 14 Nov 2026, from ASF)
+- 17 Jun 2026: PROVISIONAL calibrated products begin.
+- **27 Jul – 10 Aug 2026: permanent instrument data gap** (mid-thaw season). No 12-day pair can span it; time series must show the gap explicitly.
+- 21 Oct 2026: VALIDATED acquisitions start (after freeze-up, so not useful for thaw). 6 Nov 2026: VALIDATED L0–L2 products released. Pre-21-Oct data will be reprocessed in 2027.
+- Therefore the only NISAR thaw season available is **summer 2026, PROVISIONAL, with a gap**. Label it as such everywhere.
+- GUNW (unwrapped interferogram) is posted at **80 m**, 12-day nearest-neighbour co-pol pairs. Its ionosphere, troposphere and solid-earth-tide correction layers are included but **not applied by default**: apply them in the pipeline.
+- Check the ASF NISAR known-issues list before trusting interferograms (high-latitude ionosphere is a concern).
+- **S-band is not available over Alaska.** Joint L+S data covers India, Antarctica, Greenland and selected sites only.
+
+---
+
+## 3. Resolved conflicts between the team's UI doc and the science
+
+| Team UI doc says | Build this instead | Why |
+|---|---|---|
+| "NISAR can detect permafrost thaw"; "DARK to BRIGHT means permafrost is melting" | Never state this. Interpretation guide says: brightness (backscatter) changes every summer with normal thaw, rain, wet snow and plant growth; ground motion (InSAR) is the main measurement; neither alone proves degradation | Backscatter responds to moisture, vegetation, roughness and geometry |
+| Filter by NISAR band (L-band, S-band) | Show the band filter, but S-band is disabled over Alaska with a tooltip: "S-band is not collected over Alaska" | S-band coverage is limited |
+| Time selection: any start and end year | Allowed, but each year shows its source satellite: Sentinel-1 (OPERA DISP-S1, Jul 2016 onward), NISAR (2025 onward, thaw season only summer 2026 provisional) | NISAR alone has no multi-year record |
+| Season multi-select (spring, summer, autumn, winter) | Ground-motion features use summer only; other seasons greyed out for motion with the reason "snow cover makes radar motion unreliable". Temperature features can use any season | Snow decorrelation |
+| Graph of each feature's "average magnitude" over time | Median over valid pixels, water and excluded pixels removed first, with error band; always plotted alongside a control-tundra reference line | Averages over mixed land/lakes are misleading |
+| "Confidence score of risk of permafrost melt to infrastructure" | **Monitoring priority** per road/pipeline segment (section 6.3) plus the **measurement quality index Q**. Never label a segment "critical" or "unsafe" | 80 m pixels can't resolve structural risk; no engineering thresholds |
+| "Confidence score of long-term risk of reaching a tipping point" | **Not computed from our data.** Build a "Long-term context" panel citing published research (IPCC AR6; Armstrong McKay 2022). Optional later: an "abrupt-thaw indicator" (area of rapidly sinking or fire-affected ground) clearly labelled as an indicator, not a tipping-point probability | Ground-motion maps cannot measure carbon or tipping risk |
+| "Code it so that we can easily modify the way we generate the confidence scores" | Keep: all scoring is config-driven (section 6) | Agreed |
+| Active area 73°N/−176°, 73°N/−124°, 50°N/−124°, 50°N/−176° | Use this as the **app's display region** (lit on the globe). Processed data exists only for the MVP box 68.5–70.5°N, 152–147°W; elsewhere in the region shows "No processed data yet" | MVP scope |
+| Factors: human activity, natural disasters, urban development | Keep as story topics, but the app does not attribute thaw to roads. Frame infrastructure as exposed to ground motion, not causing it | Team decision to drop "highway causes thaw" |
+| "More visualisation or analysis modes may be added later" | Keep: analysis-module registry (section 8) | Agreed |
+
+---
+
+## 4. Study area
+
+- **Display region:** 50–73°N, 124–176°W (globe lit area).
+- **MVP processed box:** 68.5–70.5°N, 152–147°W, centred near the published Sentinel-1 study site at about 69.68°N, 148.7°W (Sag River / Dalton Highway, ~50 km south of Prudhoe Bay, continuous permafrost).
+- The Dalton Highway starts near Livengood (~80 miles north of Fairbanks) and runs to Deadhorse; the MVP box covers only the northern section.
+- **Named areas** (use plain names in the UI, no codes): Northern Dalton corridor; Control tundra (away from infrastructure, matched terrain and land cover; pick and document polygons); Prudhoe Bay oilfield and highway; Anaktuvuk River burn scar (published case study only).
+- **Later extensions** (not MVP): Brooks Range frozen debris lobes; forest near Fairbanks for an L-band vs C-band coherence test.
+
+---
+
+## 5. Data pipeline (offline, Python)
+
+Language: Python 3.11. Suggested libraries: `asf_search`, `earthaccess`, `xarray`, `rioxarray`, `h5py`, `numpy`, `scipy`, `geopandas`, `shapely`, `pyproj`, `rasterio`, `cdsapi` (ERA5-Land), `osmnx` or Geofabrik extracts, `rio-cogeo`. Use EPSG:3338 (Alaska Albers) for analysis, EPSG:4326/3857 for web output.
+
+### 5.1 Datasets (MVP)
+
+| Dataset | Source | Use |
+|---|---|---|
+| NISAR GUNW (L2, 80 m, 12-day pairs) | ASF Vertex / Earthdata (`NISAR_L2_GUNW`) | Summer 2026 ground motion |
+| OPERA DISP-S1 (Sentinel-1, 30 m, Jul 2016–now) | ASF DAAC | Multi-year baseline and cross-check |
+| ERA5-Land (2 m air temperature, total precipitation) | Copernicus Climate Data Store | ADDT; rain factor |
+| ESA CCI Permafrost (permafrost fraction, ~1 km) | CEDA | Interpretation index I |
+| MODIS snow cover (daily, 500 m) | NSIDC | Snow exclusion |
+| JRC Global Surface Water (30 m) | JRC | Water exclusion |
+| Alaska fire perimeters | Alaska Interagency Coordination Center | Fire history; Anaktuvuk outline |
+| OpenStreetMap roads and pipeline | Geofabrik | Segments for monitoring priority |
+| Sentinel-2 / HLS true colour | Copernicus / LP DAAC | Visual context basemap |
+
+Later: NISAR GCOV, ICESat-2, ALOS PALSAR, ArcticDEM, Alaska DEC Contaminated Sites database, community facilities (lagoons, clinics, runways).
+
+### 5.2 Steps
+
+1. **Common grid:** 100 m cells in EPSG:3338 over the MVP box. Every output is per cell or per road segment.
+2. **DISP-S1 baseline:** download frames covering the box; read displacement, reference date/point and correction layers; resample to grid; record temporal coherence.
+3. **NISAR GUNW:** search summer 2026 pairs over the box; for each pair apply ionosphere, troposphere and solid-earth-tide corrections; mask with coherence threshold and connected components; re-reference to a documented stable area; resample to grid. Mark the 27 Jul–10 Aug gap.
+4. **Cross-check:** compare NISAR and DISP-S1 over shared date ranges; store per-cell agreement.
+5. **Per-cell metrics:** each summer's sinking amplitude; year-to-year residual at comparable dates; fitted long-term rate $v$ with uncertainty from $d(t) = v\,t + A\sqrt{ADDT_y(t)} + c$ (report fit R² separately, do not use it in any index).
+6. **Exclusions and factors:** compute every factor in section 6 per cell per date.
+7. **Road segments:** split OSM highway and pipeline lines into ~1 km segments; buffer (e.g. 100 m each side); compute segment anomaly and z-score (section 6.3).
+8. **Export:** Cloud-Optimized GeoTIFFs or PMTiles for map layers; compact JSON (or Parquet → JSON) for per-cell/segment time series and factor values; a `manifest.json` listing layers, dates, sources, reference point, processing version and product status (PROVISIONAL/VALIDATED).
+
+### 5.3 Demo data mode
+
+Ship a `demo/` dataset generator that produces synthetic but realistic layers and time series for the MVP box so the frontend works before real data is processed. **Every screen must show a visible "Demo data" banner when demo data is loaded.** Never mix demo and real data silently.
+
+---
+
+## 6. Scoring (config-driven)
+
+All scoring lives in `scoring.config.json` (or YAML) and a pure-function module `scoring/` with unit tests. Changing weights, thresholds, transforms or factors must require editing config only. The UI reads the same config to render the "Why?" panel.
+
+### 6.1 Hard exclusions (checked first; pixel greyed out with its reason)
+- Mostly open water (JRC occurrence > 50%)
+- Snow on either radar date (MODIS)
+- Outside the permafrost map
+- Coherence below a minimum or unwrapping error mask set
+
+### 6.2 Two separate indices (neither is a probability)
+
+**Measurement quality index Q:** is this displacement value trustworthy?
+Factors (each mapped to 0–1 by a configurable transform): coherence (linear rescale 0.3→0, 0.7→1), share of valid pairs, reference stability, temporal consistency between overlapping pairs, magnitude of applied corrections (bigger = lower), agreement with DISP-S1 on shared dates.
+
+**Thaw interpretation index I:** how well do independent lines of evidence support a permafrost-thaw explanation?
+Factors: permafrost fraction (ESA CCI, used directly), thaw timing (e.g. $1 - e^{-ADDT/50}$), persistence of sinking between comparable seasons, fire history / ground-ice context, agreement with field data where available, recent-rain penalty ($e^{-r/r_0}$, window and $r_0$ in config).
+
+**Combination (both indices):**
+$$\text{Index} = \prod_i \max(f_i, \varepsilon)^{w_i}, \qquad \sum_i w_i = 1$$
+True zeros are handled as exclusions before this step; ε (e.g. 0.01) is a floor. Bands (config): high ≥ 0.75, medium 0.50–0.75, low < 0.50.
+
+Supported transform types in config: `identity`, `linear_rescale(min,max)`, `exp_decay(scale)`, `one_minus_exp(scale)`, `inverse(scale)`, `boolean`. Each factor entry: `id`, `label` (plain English), `source_dataset`, `transform`, `params`, `weight`, `index` (Q or I), `explanation` (one sentence shown in the UI).
+
+### 6.3 Monitoring priority (replaces any "infrastructure risk" score)
+For road/pipeline segment $k$:
+$$a_k = \bar v_{segment} - \tilde v_{reference}, \qquad z_k = \frac{a_k}{\sigma_k}$$
+$\bar v_{segment}$ = mean motion of valid cells in the segment buffer; $\tilde v_{reference}$ = median of nearby reference ground (configurable ring, e.g. 300–800 m, excluding infrastructure); $\sigma_k$ = combined uncertainty. Priority bands by |z| and segment-median Q (config). Label: "Monitoring priority: higher / moderate / lower". Tooltip: "Near observed ground motion; may warrant closer investigation. Not a structural safety rating."
+
+### 6.4 Long-term context panel (no score)
+Static, cited content: IPCC AR6 (high confidence thaw releases carbon, low confidence in amount; 3–41 GtC per °C by 2100, excluding abrupt thaw and fire); tipping-point research describes most of the feedback as threshold-free, with local abrupt-thaw tipping possible. Wording: "self-reinforcing feedback", never "runaway". State: "Our maps measure ground motion only, not carbon."
+
+---
+
+## 7. App specification
+
+### 7.1 Stack
+React + TypeScript + Vite. Map: MapLibre GL JS v5 with globe projection (or CesiumJS if 3D terrain is needed). Charts: a light library (e.g. Recharts or Observable Plot). State: Zustand or Redux Toolkit. Paintbrush selection: draw onto a raster mask aligned to the 100 m grid (or H3 cells), brush size adjustable. All data loaded from static files (no backend needed for MVP).
+
+### 7.2 Layout (free-roam mode, from the team doc)
+- **Centre:** rotatable 3D globe. Everything greyed out except the display region (50–73°N, 124–176°W). Zooming into the MVP box reveals data layers.
+- **Left toolbar 1 (cursor tools):** Navigate · Paint to select area (scalable brush) · Paint to deselect (scalable brush). Only data within the selected area and selected timeframe is analysed.
+- **Left toolbar 2 (timeframe):** start and end year; season multi-select (with the restrictions in section 3).
+- **Right sidebar (scrollable analysis):**
+  - Feature selector (multi-select): Ground motion (NISAR), Ground motion (Sentinel-1), Air temperature / ADDT, Measurement quality Q, Thaw interpretation I. Band filter: L-band (S-band disabled over Alaska).
+  - Charts: each selected feature over time (median + error band + control-tundra line; NISAR summer 2026 points marked PROVISIONAL; data gap shaded).
+  - Geographic heatmap of the selected feature for the selected area.
+  - Infrastructure exposure: list and map of road/pipeline segments by monitoring priority.
+  - Index summary for the selected area: share of pixels in each Q band and I band, plus medians (never an average of scores).
+  - "Why?" panel: factor bars for a clicked pixel or the selected area, weakest factor highlighted ("Limited by: low radar coherence").
+  - Long-term context panel (section 6.4).
+  - "How to interpret this data" quick guide (section 7.5).
+- **Map styling:** colour = motion rate (diverging, blue stable → red sinking, colour-blind safe); opacity = Q; excluded pixels hatched grey with reason on hover. Toggle: "Show high-quality data only".
+
+### 7.3 Core visuals (MVP, must ship)
+1. Ground-motion map (NISAR and Sentinel-1 layers, Q as opacity).
+2. Time series with quality (Sentinel-1 2016–now + NISAR 2026, error bands, gap shown, control line).
+3. Highway exposure overlay (segments by monitoring priority with uncertainty).
+
+### 7.4 Story mode (built on free roam)
+Scripted chapters; the camera flies to each location and shows short text. Each chapter has a "What we measured / what research says" split.
+1. **The big picture loop** (show as a 7-station strip with labels):
+   1 Human activity — *Published research* · 2 Warming — *Published research + our association test* · 3 Ground moves — **We measure** · 4 Wildfire — *Published case study* · 5 Infrastructure exposure — **We map** · 6 Cost and health — *Published research* · 7 Carbon feedback — *Published research* (feeds back to 2).
+2. **Zoom to the northern Dalton corridor:** highway and pipeline on frozen ground.
+3. **How radar measures movement:** simple animation of two passes and a phase shift; one fringe ≈ 12 cm.
+4. **A decade of Sentinel-1:** time series for control tundra vs oilfield and highway.
+5. **NISAR summer 2026:** first look, labelled PROVISIONAL, gap explained.
+6. **Anaktuvuk River fire (published research):** 2007 fire burned ~1,039 km²; InSAR found up to 8 cm more thaw-season sinking afterwards (Liu et al., 2014); later lidar found additional sinking in <1% of the study area by 2021, indicating stabilisation, not a return to the original state.
+7. **Monitoring priority along the highway.**
+8. **Why it matters (published context):** ~70% of permafrost-domain infrastructure in high-thaw-potential areas by 2050 (Hjort et al., 2022); $37–51B projected Alaska building and road damage by mid-century; ~170,000 people in 192 Alaskan communities live in permafrost zones (Belfer Center); long-term carbon context.
+9. **How to explore yourself:** hand-off to free roam.
+
+### 7.5 "How to interpret this data" guide (content)
+- Ground motion is measured relative to a stable reference; summer sinking and autumn rise are normal.
+- A downward trend over years is consistent with ground-ice loss but can have other causes.
+- Brightness changes every summer with normal thaw, rain, wet snow and plants; it is not proof of permafrost loss.
+- Faded areas have lower measurement quality; hatched areas were excluded (reason on hover).
+- Monitoring priority is not a safety rating.
+- Thresholds and weights are the team's choices, shown in the "Why?" panel.
+
+### 7.6 Wording rules (enforce in all UI copy)
+| Never | Use |
+|---|---|
+| NISAR detects permafrost thaw | NISAR measures surface change that, with context data, can indicate permafrost degradation |
+| The pipeline is at critical risk | These sections are near observed ground motion and may warrant closer investigation |
+| Warmer summers cause the sinking | We test whether seasonal motion is associated with accumulated summer warmth |
+| 30 years of thaw | A historical radar baseline combined with new NISAR observations |
+| The burn scar recovered | Published evidence shows substantial post-fire stabilisation |
+| Tipping-point risk score | Long-term context from published research |
+| Confidence (as a probability) | Measurement quality index / thaw interpretation index |
+
+### 7.7 Accessibility and UX
+Minimum 16px body text, 44px touch targets, WCAG AA contrast, colour-blind-safe palettes, keyboard navigation, reduced-motion option for camera flights, works at 1280px desktop and degrades gracefully to tablet.
+
+---
+
+## 8. Extensibility
+
+- **Analysis-module registry:** each module exports `{ id, label, requiredLayers, compute(selection, timeframe, config), render(result) }`. Adding a new visual or analysis = adding a module file and registering it. Ship the MVP modules: groundMotionSeries, heatmap, exposureList, indexSummary, whyPanel, longTermContext.
+- **Layer registry** driven by `manifest.json`.
+- **Planned later modules** (stub entries, disabled): NISAR GCOV wetting indicator; L-band vs C-band coherence comparison; frozen debris lobes; ALOS 2006–2010 Anaktuvuk; health and contamination layers (Alaska DEC Contaminated Sites, lagoons, clinics, runways); abrupt-thaw indicator; weight sliders for experts.
+
+---
+
+## 9. Deliverables and milestones
+
+1. Repo scaffold (pipeline/ and app/), README with setup and data download instructions.
+2. Demo data generator + app running end to end on demo data (banner visible).
+3. Scoring module + config + unit tests (exclusions, transforms, ε floor, bands, monitoring priority).
+4. Free-roam mode: globe, region mask, paint select/deselect, timeframe, right sidebar with the three core visuals.
+5. Story mode with the nine chapters.
+6. Real-data pipeline for DISP-S1 baseline, then NISAR GUNW summer 2026, then swap demo data for real data per layer.
+7. "About the data" page: sources, product status, reference point, known limitations, citations.
+
+**Acceptance criteria:** no UI string violates section 7.6; every number shown has a source, date range and quality indicator; PROVISIONAL status and the Jul–Aug 2026 gap are visible wherever NISAR data appears; changing a weight in config changes the indices and "Why?" panel with no code edits; demo data is always labelled.
+
+---
+
+## 10. Open questions to raise with the team (do not guess silently)
+
+- Exact control-tundra polygons and the stable reference area.
+- Whether to use the 100 m grid or H3 cells for paint selection.
+- MapLibre globe vs CesiumJS.
+- Source for community facility locations (OSM coverage of small Alaskan villages may be poor).
+- Whether any real NISAR GUNW pairs over the MVP box pass quality checks (verify early; this decides step 2).
+
+---
+
+## 11. Key references
+
+- NASA Space Apps 2026 challenge: https://www.spaceappschallenge.org/2026/challenges/dancing-with-the-sars/
+- ASF NISAR availability overview: https://hyp3-docs.asf.alaska.edu/nisar-docs/availability-overview/
+- ASF NISAR GUNW guide: https://nisar-docs.asf.alaska.edu/gunw/
+- NASA OPERA DISP product suite: https://www.earthdata.nasa.gov/data/projects/nsite/solutions/opera-north-america-disp-product-suite
+- Sadeghi Chorsi, Meyer and Dixon 2024 (Sentinel-1, Dalton Highway): https://tc.copernicus.org/articles/18/3723/2024/
+- Liu et al. 2014 (Anaktuvuk fire subsidence): https://pubs.usgs.gov/publication/70114502
+- Hjort et al. 2022 (infrastructure): https://www.nature.com/articles/s43017-021-00247-8
+- Alaska thaw damage $37–51B: https://par.nsf.gov/biblio/10414787
+- Belfer Center (health): https://www.belfercenter.org/research-analysis/permafrost-thaw-alaska-overlooked-climate-health-crisis
+- Woodwell review of IPCC AR6 permafrost: https://www.woodwellclimate.org/review-of-permafrost-science-in-ipccs-ar6-wg1/
+- Armstrong McKay et al. 2022 (tipping points): https://pik-potsdam.de/members/johanro/ArmstrongMcKayetal2022_ClimateTippingPointsReassessment_AcceptedversionwithFigures.pdf
