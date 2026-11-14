@@ -10,7 +10,7 @@ export function GlobeIntro({ compact = false }: { compact?: boolean }) {
       </div>
       {!compact && (
         <div className="globe-caption">
-          <span className="eyebrow">ARCTIC ALASKA · 69.7°N</span>
+          
           <strong>A narrow corridor. A changing ground surface.</strong>
         </div>
       )}

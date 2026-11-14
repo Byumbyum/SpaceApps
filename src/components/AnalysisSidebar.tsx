@@ -48,7 +48,7 @@ export function AnalysisSidebar({ cells, segments, series }: { cells: CellFeatur
   return (
     <aside className="analysis-sidebar" aria-label="Selection analysis">
       <section className="analysis-card selector-card">
-        <div className="card-heading"><div><span className="panel-kicker">ANALYSIS LAYERS</span><h2>Explore the evidence</h2></div><span className="selection-count">{selectedIds.length || cells.length} cells</span></div>
+        <div className="card-heading"><div><h2>Explore the evidence</h2></div><span className="selection-count">{selectedIds.length || cells.length} cells</span></div>
         <div className="feature-grid">
           {[['nisar', 'NISAR motion', 'PROVISIONAL'], ['sentinel', 'Sentinel-1 baseline', '2016–2026'], ['addt', 'Air temperature / ADDT', 'ASSOCIATION'], ['q', 'Measurement quality Q', 'INDEX'], ['e', 'Thaw interpretation E', 'INDEX']].map(([id, label, meta]) => (
             <label key={id}><input type="checkbox" checked={features.includes(id)} onChange={() => toggleFeature(id)} /><span>{label}<small>{meta}</small></span></label>
@@ -64,7 +64,7 @@ export function AnalysisSidebar({ cells, segments, series }: { cells: CellFeatur
       {features.some((id) => id === 'nisar' || id === 'sentinel') && <TimeSeriesPanel series={series} startYear={startYear} endYear={endYear} />}
 
       <section className="analysis-card">
-        <div className="card-heading"><div><span className="panel-kicker">GEOGRAPHIC HEATMAP</span><h3>{layer === 'motion' ? 'Ground-motion pattern' : layer === 'quality' ? 'Measurement quality' : 'Interpretation support'}</h3></div><EvidenceTag kind={layer === 'motion' ? 'OBSERVED' : 'INFERRED'} /></div>
+        <div className="card-heading"><div><h3>{layer === 'motion' ? 'Ground-motion pattern' : layer === 'quality' ? 'Measurement quality' : 'Interpretation support'}</h3></div><EvidenceTag kind={layer === 'motion' ? 'OBSERVED' : 'INFERRED'} /></div>
         <div className="mini-heatmap" aria-label="Grid overview">
           {cells.map(({ properties }) => <i key={properties.id} className={properties.excluded ? 'excluded' : ''} style={{ opacity: properties.excluded ? 0.25 : Math.max(0.18, properties.q), backgroundColor: layer === 'quality' ? `color-mix(in srgb, #bfe8c5 ${properties.q * 100}%, #4b3152)` : layer === 'interpretation' ? `color-mix(in srgb, #efd184 ${properties.e * 100}%, #3b3156)` : properties.motion_cm_yr < -2 ? '#d95f4f' : properties.motion_cm_yr < -1 ? '#e7b55c' : '#63aebf' }} />)}
         </div>
@@ -72,7 +72,7 @@ export function AnalysisSidebar({ cells, segments, series }: { cells: CellFeatur
       </section>
 
       <section className="analysis-card">
-        <div className="card-heading"><div><span className="panel-kicker">INDEX SUMMARY · MEDIANS</span><h3>Quality and interpretation</h3></div><EvidenceTag kind="INFERRED" /></div>
+        <div className="card-heading"><div><h3>Quality and interpretation</h3></div><EvidenceTag kind="INFERRED" /></div>
         <div className="index-median-row"><div><span>Q</span><strong>{median(included.map((feature) => feature.properties.q)).toFixed(2)}</strong><small>measurement quality</small></div><div><span>E</span><strong>{median(included.map((feature) => feature.properties.e)).toFixed(2)}</strong><small>thaw interpretation</small></div></div>
         <div className="band-summary">
           <div><b>Q share of valid cells</b>{bands('q_band').map(({ band, share }) => <span key={band}><i className={band} style={{ width: `${share * 100}%` }} /><em>{band} {Math.round(share * 100)}%</em></span>)}</div>
@@ -82,7 +82,7 @@ export function AnalysisSidebar({ cells, segments, series }: { cells: CellFeatur
       </section>
 
       <section className="analysis-card why-card">
-        <div className="card-heading"><div><span className="panel-kicker">WHY?</span><h3>{focused?.area_name ?? 'Select a valid cell'}</h3></div><EvidenceTag kind="INFERRED" /></div>
+        <div className="card-heading"><div><h3>{focused?.area_name ?? 'Select a valid cell'}</h3></div><EvidenceTag kind="INFERRED" /></div>
         {focused && qResult && eResult ? <>
           <div className="coordinate-readout"><span>GRID CELL {focused.id}</span><strong>{focused.latitude.toFixed(4)}°N, {Math.abs(focused.longitude).toFixed(4)}°W</strong><small>Centroid from the GeoJSON geometry · WGS 84</small></div>
           <div className="quality-badges"><span>Measurement Q: <b>{qResult.band} · {qResult.value?.toFixed(2)}</b></span><span>Interpretation E: <b>{eResult.band} · {eResult.value?.toFixed(2)}</b></span></div>
@@ -92,13 +92,13 @@ export function AnalysisSidebar({ cells, segments, series }: { cells: CellFeatur
       </section>
 
       <section className="analysis-card exposure-card">
-        <div className="card-heading"><div><span className="panel-kicker">INFRASTRUCTURE EXPOSURE</span><h3>Segments to revisit</h3></div><EvidenceTag kind="INFERRED" /></div>
+        <div className="card-heading"><div><h3>Segments to revisit</h3></div><EvidenceTag kind="INFERRED" /></div>
         <p className="safety-note">Near observed ground motion; may warrant closer investigation. Not a structural safety rating.</p>
         <div className="segment-list">{orderedSegments.slice(0, 7).map(({ properties }) => <div key={properties.id}><span className={`priority-dot ${properties.priority}`} /><div><strong>{properties.name}</strong><small>{Math.round(properties.valid_coverage * 100)}% valid coverage · uncertainty ±{properties.uncertainty_cm} cm</small></div><b>{properties.priority}</b></div>)}</div>
       </section>
 
       <section className="analysis-card context-card">
-        <div className="card-heading"><div><span className="panel-kicker">LONG-TERM CONTEXT · NO SCORE</span><h3>Carbon feedback</h3></div><EvidenceTag kind="PUBLISHED" /></div>
+        <div className="card-heading"><div><h3>Carbon feedback</h3></div><EvidenceTag kind="PUBLISHED" /></div>
         <p>Published research describes a <strong>self-reinforcing feedback</strong>, with possible localized abrupt thaw. IPCC AR6 assessed high confidence that thaw releases carbon, while the amount remains uncertain.</p>
         <p className="context-emphasis">Our maps measure ground motion only, not carbon.</p>
         <div className="source-links"><a href="https://www.woodwellclimate.org/review-of-permafrost-science-in-ipccs-ar6-wg1/" target="_blank" rel="noreferrer">IPCC AR6 review ↗</a><a href="https://pik-potsdam.de/members/johanro/ArmstrongMcKayetal2022_ClimateTippingPointsReassessment_AcceptedversionwithFigures.pdf" target="_blank" rel="noreferrer">Armstrong McKay 2022 ↗</a></div>

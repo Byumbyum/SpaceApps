@@ -1,25 +1,34 @@
 import type { DemoCellProperties, SegmentProperties, TimePoint } from '../types';
-import { AnalysisSidebar } from './AnalysisSidebar';
-import { MapPanel } from './MapPanel';
-import { ToolDock } from './ToolDock';
-import { SelectionInsight } from './SelectionInsight';
+import { PHENOMENA } from '../lib/phenomena';
 import { useAppStore } from '../store';
+import { AreaInsights } from './AreaInsights';
+import { InsightsDrawer } from './InsightsDrawer';
+import { MapPanel } from './MapPanel';
 
 type Feature<P> = { type: 'Feature'; id?: number; properties: P; geometry: unknown };
 type Collection<P> = { type: 'FeatureCollection'; features: Array<Feature<P>> };
 
 export function ExploreMode({ cells, segments, series }: { cells: Collection<DemoCellProperties>; segments: Collection<SegmentProperties>; series: TimePoint[] }) {
-  const analysisOpen = useAppStore((state) => state.analysisOpen);
-  const setAnalysisOpen = useAppStore((state) => state.setAnalysisOpen);
+  const phenomenon = useAppStore((state) => state.phenomenon);
+  const setPhenomenon = useAppStore((state) => state.setPhenomenon);
+  const hasPanel = useAppStore((state) => state.selectedArea !== null);
+  const drawerOpen = useAppStore((state) => state.analysisOpen && state.selectedArea !== null);
+  const active = PHENOMENA.find((item) => item.id === phenomenon);
+
   return (
-    <main id="main-content" className="explore-page">
+    <main id="main-content" className={`explore-page ${hasPanel ? 'has-panel' : ''} ${drawerOpen ? 'has-drawer' : ''}`}>
       <MapPanel cells={cells} segments={segments} />
-      <ToolDock />
-      <SelectionInsight cells={cells.features} />
-      <button className={`analysis-toggle ${analysisOpen ? 'open' : ''}`} onClick={() => setAnalysisOpen(!analysisOpen)} aria-expanded={analysisOpen} aria-controls="analysis-drawer"><span>{analysisOpen ? '×' : '≡'}</span>{analysisOpen ? 'Close data' : 'Explore data'}</button>
-      <div id="analysis-drawer" className={`analysis-drawer ${analysisOpen ? 'open' : ''}`}>
-        <AnalysisSidebar cells={cells.features} segments={segments.features} series={series} />
-      </div>
+      <AreaInsights />
+      <InsightsDrawer series={series} />
+      {active && !active.available && (
+        <div className="coming-soon" role="status">
+          <h2>Coming soon…</h2>
+          <p>{active.label} insights are on the way. View other parameters!</p>
+          <div className="coming-soon-actions">
+            <button className="primary-action" onClick={() => setPhenomenon('permafrost')}>Back to permafrost thaw</button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

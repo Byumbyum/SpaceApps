@@ -1,9 +1,18 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as maplibregl from 'maplibre-gl';
-import type { CircleLayerSpecification, FillLayerSpecification, GeoJSONSourceSpecification, LineLayerSpecification } from 'maplibre-gl';
-import { ALASKA_FOCUS_BOUNDS, BASEMAP, MVP_BOUNDS } from '../config/map';
+import type { FillLayerSpecification, GeoJSONSource, GeoJSONSourceSpecification, LineLayerSpecification } from 'maplibre-gl';
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
+import { BASEMAPS, INITIAL_VIEW, MVP_BOUNDS, VECTOR_STYLE_URL, type BasemapId } from '../config/map';
+import { boxAreaKm2, boxRing, circleRing, formatCoordinate, nearestPlace, type LngLat, type Place, type SelectedArea } from '../lib/geo';
+import { reverseGeocode } from '../lib/geocode';
 import { useAppStore } from '../store';
 import type { DemoCellProperties, SegmentProperties } from '../types';
+import { CompassIcon, DrawIcon, LayersIcon, MinusIcon, PlusIcon } from './Icons';
+import { MapSearch } from './MapSearch';
+
+// MapLibre locates its worker relative to its own module, which breaks once Vite
+// pre-bundles the dependency. Pointing at the shipped worker file fixes both dev and build.
+maplibregl.setWorkerUrl(workerUrl);
 
 type Feature<P> = { type: 'Feature'; id?: number; properties: P; geometry: unknown };
 type Collection<P> = { type: 'FeatureCollection'; features: Array<Feature<P>> };
@@ -13,355 +22,294 @@ interface MapPanelProps {
   segments: Collection<SegmentProperties>;
 }
 
-const mapStyle: maplibregl.StyleSpecification = {
-  version: 8,
-  sources: {
-    [BASEMAP.id]: {
-      type: 'raster',
-      tiles: [...BASEMAP.tiles],
-      tileSize: BASEMAP.tileSize,
-      minzoom: BASEMAP.minZoom,
-      maxzoom: BASEMAP.maxZoom,
-      attribution: BASEMAP.attribution,
-    },
-  },
-  layers: [
-    { id: 'background', type: 'background', paint: { 'background-color': '#17383d' } },
-    {
-      id: 'real-map',
-      type: 'raster',
-      source: BASEMAP.id,
-      paint: {
-        'raster-opacity': 0.82,
-        'raster-saturation': -0.72,
-        'raster-contrast': 0.12,
-        'raster-brightness-min': 0.1,
-        'raster-brightness-max': 0.72,
-      },
-    },
-  ],
-};
+const DEMO_LAYERS = ['demo-cells', 'demo-highway', 'demo-pipeline', 'demo-extent'];
+const SELECT_RADIUS_PX = 70;
+const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
+
+// Vector layers hidden in satellite mode; roads, boundaries and labels stay on top of the imagery.
+const HIDDEN_IN_SATELLITE = new Set(['fill', 'fill-extrusion', 'raster', 'hillshade']);
+
+async function buildStyle(): Promise<maplibregl.StyleSpecification> {
+  const satelliteSource: maplibregl.RasterSourceSpecification = { type: 'raster', tiles: [...BASEMAPS.satellite.tiles], tileSize: BASEMAPS.satellite.tileSize, maxzoom: BASEMAPS.satellite.maxZoom, attribution: BASEMAPS.satellite.attribution };
+  const satelliteLayer: maplibregl.LayerSpecification = { id: 'basemap-satellite', type: 'raster', source: 'basemap-satellite', layout: { visibility: 'none' } };
+  let style: maplibregl.StyleSpecification;
+  try {
+    const response = await fetch(VECTOR_STYLE_URL);
+    if (!response.ok) throw new Error(String(response.status));
+    style = (await response.json()) as maplibregl.StyleSpecification;
+  } catch {
+    style = {
+      version: 8,
+      sources: { 'basemap-fallback': { type: 'raster', tiles: [...BASEMAPS.fallbackMap.tiles], tileSize: BASEMAPS.fallbackMap.tileSize, maxzoom: BASEMAPS.fallbackMap.maxZoom, attribution: BASEMAPS.fallbackMap.attribution } },
+      layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#dfe7ec' } }, { id: 'basemap-fallback', type: 'raster', source: 'basemap-fallback' }],
+    };
+  }
+  const layers = style.layers.filter((layer) => layer.id !== 'building-3d');
+  const backgroundIndex = layers.findIndex((layer) => layer.type === 'background');
+  layers.splice(backgroundIndex + 1, 0, satelliteLayer);
+  return {
+    ...style,
+    projection: { type: 'globe' },
+    sky: { 'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 7, 0] },
+    sources: { ...style.sources, 'basemap-satellite': satelliteSource },
+    layers,
+  };
+}
+
+function applyBasemap(map: maplibregl.Map, basemap: BasemapId) {
+  const satellite = basemap === 'satellite';
+  for (const layer of map.getStyle().layers) {
+    if (layer.id === 'basemap-satellite') map.setLayoutProperty(layer.id, 'visibility', satellite ? 'visible' : 'none');
+    else if (HIDDEN_IN_SATELLITE.has(layer.type) && !layer.id.startsWith('demo-') && !layer.id.startsWith('area-') && !layer.id.startsWith('draft-')) map.setLayoutProperty(layer.id, 'visibility', satellite ? 'none' : 'visible');
+  }
+}
+
+function metersPerPixel(lat: number, zoom: number) {
+  return (40075016.686 * Math.cos((lat * Math.PI) / 180)) / (512 * 2 ** zoom);
+}
+
+function insideRing([x, y]: LngLat, ring: LngLat[]) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+const ringFeature = (ring: LngLat[]): GeoJSON.Feature => ({ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [ring] } });
 
 export function MapPanel({ cells, segments }: MapPanelProps) {
   const container = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
-  const readyRef = useRef(false);
-  const toolRef = useRef(useAppStore.getState().tool);
-  const brushRef = useRef(useAppStore.getState().brushSize);
-  const painting = useRef(false);
-  const [mapStatus, setMapStatus] = useState<'loading' | 'ready' | 'fallback'>('loading');
-  const [mapError, setMapError] = useState<string | null>(null);
-  const tool = useAppStore((state) => state.tool);
-  const brushSize = useAppStore((state) => state.brushSize);
-  const layer = useAppStore((state) => state.layer);
-  const highQualityOnly = useAppStore((state) => state.highQualityOnly);
-  const selectedCellIds = useAppStore((state) => state.selectedCellIds);
-  const setFocusedCellId = useAppStore((state) => state.setFocusedCellId);
+  const geocodeAbort = useRef<AbortController | null>(null);
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [bearing, setBearing] = useState(0);
+  const [layersOpen, setLayersOpen] = useState(false);
+  const basemap = useAppStore((state) => state.basemap);
+  const setBasemap = useAppStore((state) => state.setBasemap);
+  const drawing = useAppStore((state) => state.drawing);
+  const setDrawing = useAppStore((state) => state.setDrawing);
+  const selectedArea = useAppStore((state) => state.selectedArea);
+  const showDemoGrid = useAppStore((state) => state.showDemoGrid);
+  const setShowDemoGrid = useAppStore((state) => state.setShowDemoGrid);
 
-  useEffect(() => { toolRef.current = tool; brushRef.current = brushSize; }, [tool, brushSize]);
+  const commitArea = useCallback((shape: SelectedArea['shape'], center: LngLat, ring: LngLat[], areaKm2: number, place?: Place) => {
+    const nearby = place ? { place } : nearestPlace(center, 40);
+    const area: SelectedArea = {
+      id: `${Date.now()}`,
+      shape,
+      center,
+      ring,
+      areaKm2,
+      name: nearby ? nearby.place.name : 'Selected area',
+      region: nearby ? nearby.place.region : formatCoordinate(center),
+    };
+    const store = useAppStore.getState();
+    store.setSelectedArea(area);
+    store.clearSelection();
+    store.addSelectedCells(cells.features.filter(({ properties }) => insideRing([properties.longitude, properties.latitude], ring)).map(({ properties }) => properties.id));
 
-  useEffect(() => {
-    const map = mapRef.current;
-    if (mapStatus !== 'ready' || tool === 'navigate' || !map || map.getZoom() >= 5) return;
-    map.fitBounds([[MVP_BOUNDS.west, MVP_BOUNDS.south], [MVP_BOUNDS.east, MVP_BOUNDS.north]], { padding: 72, duration: 700 });
-  }, [tool, mapStatus]);
+    if (nearby) return;
+    geocodeAbort.current?.abort();
+    const controller = new AbortController();
+    geocodeAbort.current = controller;
+    reverseGeocode(center, mapRef.current?.getZoom() ?? 6, controller.signal)
+      .then((found) => { if (found) useAppStore.getState().renameSelectedArea(area.id, found.name, found.region || formatCoordinate(center)); })
+      .catch(() => undefined);
+  }, [cells]);
+
+  const commitRef = useRef(commitArea);
+  useEffect(() => { commitRef.current = commitArea; }, [commitArea]);
 
   useEffect(() => {
     if (!container.current || mapRef.current) return;
-    setMapStatus('loading');
-    setMapError(null);
-    readyRef.current = false;
+    let cancelled = false;
+    let teardown = () => { cancelled = true; };
+    void buildStyle().then((style) => {
+      if (cancelled || !container.current) return;
+      teardown = initMap(container.current, style);
+    });
+    return () => teardown();
+  }, [cells, segments]);
+
+  function initMap(element: HTMLDivElement, style: maplibregl.StyleSpecification) {
     let map: maplibregl.Map;
-    const dataBounds: [[number, number], [number, number]] = [
-      [MVP_BOUNDS.west, MVP_BOUNDS.south],
-      [MVP_BOUNDS.east, MVP_BOUNDS.north],
-    ];
-    const focusBounds: [[number, number], [number, number]] = [
-      [ALASKA_FOCUS_BOUNDS.west, ALASKA_FOCUS_BOUNDS.south],
-      [ALASKA_FOCUS_BOUNDS.east, ALASKA_FOCUS_BOUNDS.north],
-    ];
     try {
       map = new maplibregl.Map({
-        container: container.current,
-        style: structuredClone(mapStyle),
-        bounds: focusBounds,
-        fitBoundsOptions: { padding: 48 },
-        minZoom: 2,
-        maxZoom: 11,
+        container: element,
+        style,
+        center: INITIAL_VIEW.center,
+        zoom: INITIAL_VIEW.zoom,
+        minZoom: 1,
+        maxZoom: 19,
         attributionControl: false,
-        pitchWithRotate: false,
-        dragRotate: false,
       });
-    } catch (error) {
-      setMapError(error instanceof Error ? error.message : 'WebGL map initialization failed.');
-      setMapStatus('fallback');
-      return;
+    } catch {
+      setStatus('error');
+      return () => undefined;
     }
     mapRef.current = map;
-    map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }), 'bottom-right');
-    map.addControl(new maplibregl.ScaleControl({ unit: 'metric', maxWidth: 110 }), 'bottom-left');
-    map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: 'Demo grid · EPSG:3338 analysis' }));
-
-    const paintAt = (point: maplibregl.Point) => {
-      if (toolRef.current === 'navigate') return;
-      const size = brushRef.current;
-      const features = map.queryRenderedFeatures([[point.x - size, point.y - size], [point.x + size, point.y + size]], { layers: ['cells-fill'] });
-      const ids = features.map((feature) => String(feature.properties?.id ?? '')).filter(Boolean);
-      if (toolRef.current === 'select') useAppStore.getState().addSelectedCells(ids);
-      if (toolRef.current === 'deselect') useAppStore.getState().removeSelectedCells(ids);
-    };
-
-    map.on('error', (event) => {
-      if (readyRef.current) return;
-      const message = event.error?.message ?? 'The WebGL map reported an initialization error.';
-      setMapError(message);
-    });
+    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+    map.addControl(new maplibregl.ScaleControl({ unit: 'metric', maxWidth: 96 }), 'bottom-right');
 
     map.on('load', () => {
-      try {
-        map.addSource('alaska-focus', {
-          type: 'geojson',
-          data: {
-            type: 'Feature', properties: { name: 'Alaska focus area' }, geometry: { type: 'Polygon', coordinates: [[
-              [ALASKA_FOCUS_BOUNDS.west, ALASKA_FOCUS_BOUNDS.north],
-              [ALASKA_FOCUS_BOUNDS.east, ALASKA_FOCUS_BOUNDS.north],
-              [ALASKA_FOCUS_BOUNDS.east, ALASKA_FOCUS_BOUNDS.south],
-              [ALASKA_FOCUS_BOUNDS.west, ALASKA_FOCUS_BOUNDS.south],
-              [ALASKA_FOCUS_BOUNDS.west, ALASKA_FOCUS_BOUNDS.north],
-            ]] },
-          },
-        });
-        map.addSource('processed-area', {
-          type: 'geojson',
-          data: {
-            type: 'Feature', properties: { name: 'Northern Dalton processed area' }, geometry: { type: 'Polygon', coordinates: [[
-              [MVP_BOUNDS.west, MVP_BOUNDS.north], [MVP_BOUNDS.east, MVP_BOUNDS.north],
-              [MVP_BOUNDS.east, MVP_BOUNDS.south], [MVP_BOUNDS.west, MVP_BOUNDS.south],
-              [MVP_BOUNDS.west, MVP_BOUNDS.north],
-            ]] },
-          },
-        });
-        map.addLayer({ id: 'alaska-focus-fill', type: 'fill', source: 'alaska-focus', paint: { 'fill-color': '#69bdc8', 'fill-opacity': 0.045 } } as FillLayerSpecification);
-        map.addLayer({ id: 'alaska-focus-outline', type: 'line', source: 'alaska-focus', paint: { 'line-color': '#69bdc8', 'line-width': 2, 'line-dasharray': [3, 2] } } as LineLayerSpecification);
-        map.addLayer({ id: 'processed-area-fill', type: 'fill', source: 'processed-area', paint: { 'fill-color': '#ff715b', 'fill-opacity': 0.14 } } as FillLayerSpecification);
-        map.addLayer({ id: 'processed-area-outline', type: 'line', source: 'processed-area', paint: { 'line-color': '#ff715b', 'line-width': 3 } } as LineLayerSpecification);
-        map.addSource('cells', { type: 'geojson', data: cells as GeoJSONSourceSpecification['data'], generateId: false });
-        map.addSource('segments', { type: 'geojson', data: segments as GeoJSONSourceSpecification['data'] });
-        map.addSource('cell-points', {
-          type: 'geojson',
-          data: {
-            type: 'FeatureCollection',
-            features: cells.features.map(({ properties }) => ({
-              type: 'Feature',
-              properties,
-              geometry: { type: 'Point', coordinates: [properties.longitude, properties.latitude] },
-            })),
-          } as GeoJSONSourceSpecification['data'],
-        });
-        map.addLayer({
-          id: 'cells-fill', type: 'fill', source: 'cells',
-          paint: {
-            'fill-color': ['case', ['boolean', ['get', 'excluded'], false], '#657174', ['interpolate', ['linear'], ['get', 'motion_cm_yr'], -3.5, '#d95f4f', -1.4, '#e7b55c', -0.4, '#72b8c7', 0.2, '#2f7f94']],
-            'fill-opacity': ['case', ['boolean', ['get', 'excluded'], false], 0.14, ['interpolate', ['linear'], ['get', 'q'], 0, 0.2, 1, 0.64]],
-            'fill-outline-color': '#0e3136',
-          },
-        } as FillLayerSpecification);
-        map.addLayer({
-          id: 'cells-selected', type: 'fill', source: 'cells', filter: ['in', ['get', 'id'], ['literal', []]],
-          paint: { 'fill-color': '#ffffff', 'fill-opacity': 0.12, 'fill-outline-color': '#ffffff' },
-        } as FillLayerSpecification);
-        map.addLayer({
-          id: 'pipeline', type: 'line', source: 'segments', filter: ['==', ['get', 'asset'], 'pipeline'],
-          paint: { 'line-color': '#f1c969', 'line-width': 3, 'line-dasharray': [1, 1.5] },
-        } as LineLayerSpecification);
-        map.addLayer({
-          id: 'highway', type: 'line', source: 'segments', filter: ['==', ['get', 'asset'], 'highway'],
-          paint: { 'line-color': ['match', ['get', 'priority'], 'higher', '#ff6b55', 'moderate', '#f1b85b', 'lower', '#79c8c2', '#728083'], 'line-width': 5 },
-        } as LineLayerSpecification);
-        map.addLayer({
-          id: 'cell-points', type: 'circle', source: 'cell-points',
-          paint: {
-            'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 1.5, 9, 4],
-            'circle-color': '#f8f3df',
-            'circle-stroke-color': '#07171a',
-            'circle-stroke-width': 1,
-            'circle-opacity': ['case', ['boolean', ['get', 'excluded'], false], 0.15, 0.82],
-          },
-        } as CircleLayerSpecification);
-        map.fitBounds(focusBounds, { padding: 54, duration: 0 });
-        const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 9, className: 'cell-coordinate-popup' });
-        map.on('mouseenter', 'cell-points', () => { map.getCanvas().style.cursor = 'pointer'; });
-        map.on('mouseleave', 'cell-points', () => { popup.remove(); map.getCanvas().style.cursor = toolRef.current === 'navigate' ? 'grab' : 'crosshair'; });
-        map.on('mousemove', 'cell-points', (event) => {
-          const properties = event.features?.[0]?.properties as DemoCellProperties | undefined;
-          if (!properties) return;
-          const content = document.createElement('div');
-          const title = document.createElement('strong');
-          title.textContent = properties.area_name;
-          const coordinates = document.createElement('span');
-          coordinates.textContent = `${Number(properties.latitude).toFixed(4)}°N, ${Math.abs(Number(properties.longitude)).toFixed(4)}°W`;
-          const metric = document.createElement('small');
-          metric.textContent = properties.excluded ? String(properties.exclusion_reason) : `${Number(properties.motion_cm_yr).toFixed(2)} cm/yr · Q ${Number(properties.q).toFixed(2)} · E ${Number(properties.e).toFixed(2)}`;
-          content.append(title, coordinates, metric);
-          popup.setLngLat([Number(properties.longitude), Number(properties.latitude)]).setDOMContent(content).addTo(map);
-        });
-        let verificationAttempts = 0;
-        const verifyVisibleGrid = () => {
-          const loadedCells = map.querySourceFeatures('cells');
-          if (loadedCells.length > 0) {
-            readyRef.current = true;
-            setMapError(null);
-            setMapStatus('ready');
-            return;
-          }
-          verificationAttempts += 1;
-          if (verificationAttempts < 2) {
-            map.fitBounds(dataBounds, { padding: 48, duration: 0 });
-            map.once('idle', verifyVisibleGrid);
-            return;
-          }
-          setMapError('MapLibre started, but the analysis cells did not render.');
-          setMapStatus('fallback');
-        };
-        map.once('idle', verifyVisibleGrid);
-      } catch (error) {
-        setMapError(error instanceof Error ? error.message : 'The map layers could not be created.');
-        setMapStatus('fallback');
-      }
+      map.addSource('demo-cells', { type: 'geojson', data: cells as GeoJSONSourceSpecification['data'] });
+      map.addSource('demo-segments', { type: 'geojson', data: segments as GeoJSONSourceSpecification['data'] });
+      map.addSource('demo-extent', { type: 'geojson', data: ringFeature(boxRing([MVP_BOUNDS.west, MVP_BOUNDS.south], [MVP_BOUNDS.east, MVP_BOUNDS.north])) });
+      map.addSource('area', { type: 'geojson', data: EMPTY });
+      map.addSource('draft', { type: 'geojson', data: EMPTY });
+      const demoVisibility = useAppStore.getState().showDemoGrid ? 'visible' : 'none';
+      map.addLayer({
+        id: 'demo-cells', type: 'fill', source: 'demo-cells', layout: { visibility: demoVisibility },
+        paint: {
+          'fill-color': ['case', ['boolean', ['get', 'excluded'], false], '#9aa5ab', ['interpolate', ['linear'], ['get', 'motion_cm_yr'], -3.5, '#d93025', -1.4, '#f9ab00', -0.4, '#8ab4f8', 0.2, '#1a73e8']],
+          'fill-opacity': ['case', ['boolean', ['get', 'excluded'], false], 0.2, ['interpolate', ['linear'], ['get', 'q'], 0, 0.25, 1, 0.6]],
+        },
+      } as FillLayerSpecification);
+      map.addLayer({ id: 'demo-pipeline', type: 'line', source: 'demo-segments', filter: ['==', ['get', 'asset'], 'pipeline'], layout: { visibility: demoVisibility }, paint: { 'line-color': '#5f6368', 'line-width': 2, 'line-dasharray': [2, 2] } } as LineLayerSpecification);
+      map.addLayer({ id: 'demo-highway', type: 'line', source: 'demo-segments', filter: ['==', ['get', 'asset'], 'highway'], layout: { visibility: demoVisibility }, paint: { 'line-color': ['match', ['get', 'priority'], 'higher', '#d93025', 'moderate', '#f9ab00', '#34a853'], 'line-width': 3 } } as LineLayerSpecification);
+      map.addLayer({ id: 'demo-extent', type: 'line', source: 'demo-extent', layout: { visibility: demoVisibility }, paint: { 'line-color': '#5f6368', 'line-width': 1.5, 'line-dasharray': [3, 2] } } as LineLayerSpecification);
+      map.addLayer({ id: 'area-fill', type: 'fill', source: 'area', paint: { 'fill-color': '#1a73e8', 'fill-opacity': 0.12 } } as FillLayerSpecification);
+      map.addLayer({ id: 'area-line', type: 'line', source: 'area', paint: { 'line-color': '#1a73e8', 'line-width': 2.5 } } as LineLayerSpecification);
+      map.addLayer({ id: 'draft-fill', type: 'fill', source: 'draft', paint: { 'fill-color': '#1a73e8', 'fill-opacity': 0.08 } } as FillLayerSpecification);
+      map.addLayer({ id: 'draft-line', type: 'line', source: 'draft', paint: { 'line-color': '#1a73e8', 'line-width': 2, 'line-dasharray': [2, 1.5] } } as LineLayerSpecification);
+      applyBasemap(map, useAppStore.getState().basemap);
+      setStatus('ready');
     });
 
-    map.on('mousedown', (event) => {
-      if (toolRef.current === 'navigate') return;
-      painting.current = true;
+    map.on('rotate', () => setBearing(map.getBearing()));
+
+    // Click selects a circular area scaled to the current zoom; Draw mode drags a box.
+    let dragStart: LngLat | null = null;
+    let justDrew = false;
+    const draftSource = () => map.getSource('draft') as GeoJSONSource | undefined;
+
+    const startDraw = (lngLat: maplibregl.LngLat) => {
+      if (!useAppStore.getState().drawing) return false;
+      dragStart = [lngLat.lng, lngLat.lat];
       map.dragPan.disable();
-      paintAt(event.point);
-    });
-    map.on('mousemove', (event) => {
-      if (painting.current) paintAt(event.point);
-      map.getCanvas().style.cursor = toolRef.current === 'navigate' ? 'grab' : 'crosshair';
-    });
-    const stopPainting = () => {
-      painting.current = false;
-      map.dragPan.enable();
+      return true;
     };
-    map.on('mouseup', stopPainting);
-    map.getCanvas().addEventListener('mouseleave', stopPainting);
-    map.on('click', 'cells-fill', (event) => {
-      const feature = event.features?.[0];
-      if (feature?.properties?.id) setFocusedCellId(String(feature.properties.id));
+    const moveDraw = (lngLat: maplibregl.LngLat) => {
+      if (!dragStart) return;
+      draftSource()?.setData(ringFeature(boxRing(dragStart, [lngLat.lng, lngLat.lat])));
+    };
+    const endDraw = (lngLat: maplibregl.LngLat) => {
+      if (!dragStart) return;
+      const start = dragStart;
+      const ring = boxRing(start, [lngLat.lng, lngLat.lat]);
+      dragStart = null;
+      map.dragPan.enable();
+      draftSource()?.setData(EMPTY);
+      useAppStore.getState().setDrawing(false);
+      justDrew = true;
+      window.setTimeout(() => { justDrew = false; }, 50);
+      const areaKm2 = boxAreaKm2(ring);
+      if (areaKm2 < 0.05) return;
+      commitRef.current('box', [(start[0] + lngLat.lng) / 2, (start[1] + lngLat.lat) / 2], ring, areaKm2);
+    };
+
+    map.on('mousedown', (event) => { if (startDraw(event.lngLat)) event.preventDefault(); });
+    map.on('mousemove', (event) => moveDraw(event.lngLat));
+    map.on('mouseup', (event) => endDraw(event.lngLat));
+    map.on('touchstart', (event) => { if (event.points.length === 1 && startDraw(event.lngLat)) event.preventDefault(); });
+    map.on('touchmove', (event) => moveDraw(event.lngLat));
+    map.on('touchend', (event) => endDraw(event.lngLat));
+
+    map.on('click', (event) => {
+      if (justDrew || useAppStore.getState().drawing) return;
+      const center: LngLat = [event.lngLat.lng, event.lngLat.lat];
+      const radiusKm = Math.min(500, Math.max(0.5, (SELECT_RADIUS_PX * metersPerPixel(center[1], map.getZoom())) / 1000));
+      commitRef.current('circle', center, circleRing(center, radiusKm), Math.PI * radiusKm ** 2);
     });
-    const loadingTimeout = window.setTimeout(() => {
-      if (!readyRef.current) {
-        setMapError((current) => current ?? 'Map initialization timed out.');
-        setMapStatus('fallback');
-      }
-    }, 5000);
+
     return () => {
-      window.clearTimeout(loadingTimeout);
-      readyRef.current = false;
+      geocodeAbort.current?.abort();
       map.remove();
       mapRef.current = null;
     };
-  }, [cells, segments, setFocusedCellId]);
+  }
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map?.getLayer('cells-selected')) return;
-    map.setFilter('cells-selected', ['in', ['get', 'id'], ['literal', selectedCellIds]]);
-  }, [selectedCellIds]);
+    if (status !== 'ready' || !map) return;
+    applyBasemap(map, basemap);
+  }, [basemap, status]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map?.getLayer('cells-fill')) return;
-    const colorExpression: maplibregl.ExpressionSpecification = layer === 'quality'
-      ? ['interpolate', ['linear'], ['get', 'q'], 0, '#522f42', 0.5, '#c08b58', 0.75, '#8ec9b1', 1, '#ddf4d5']
-      : layer === 'interpretation'
-        ? ['interpolate', ['linear'], ['get', 'e'], 0, '#3a3154', 0.5, '#8972a7', 0.75, '#d0ad70', 1, '#f5dd91']
-        : ['case', ['boolean', ['get', 'excluded'], false], '#657174', ['interpolate', ['linear'], ['get', 'motion_cm_yr'], -3.5, '#d95f4f', -1.4, '#e7b55c', -0.4, '#72b8c7', 0.2, '#2f7f94']];
-    map.setPaintProperty('cells-fill', 'fill-color', colorExpression);
-    map.setFilter('cells-fill', highQualityOnly ? ['all', ['==', ['get', 'excluded'], false], ['>=', ['get', 'q'], 0.75]] : null);
-  }, [layer, highQualityOnly]);
+    if (status !== 'ready' || !map) return;
+    DEMO_LAYERS.forEach((layer) => map.setLayoutProperty(layer, 'visibility', showDemoGrid ? 'visible' : 'none'));
+  }, [showDemoGrid, status]);
 
-  const fitView = (view: 'focus' | 'data') => {
+  useEffect(() => {
     const map = mapRef.current;
-    if (!map || mapStatus !== 'ready') return;
-    const bounds: [[number, number], [number, number]] = view === 'focus'
-      ? [[ALASKA_FOCUS_BOUNDS.west, ALASKA_FOCUS_BOUNDS.south], [ALASKA_FOCUS_BOUNDS.east, ALASKA_FOCUS_BOUNDS.north]]
-      : [[MVP_BOUNDS.west, MVP_BOUNDS.south], [MVP_BOUNDS.east, MVP_BOUNDS.north]];
-    map.fitBounds(bounds, { padding: view === 'focus' ? 54 : 72, duration: 700 });
+    if (status !== 'ready' || !map) return;
+    (map.getSource('area') as GeoJSONSource).setData(selectedArea ? ringFeature(selectedArea.ring) : EMPTY);
+  }, [selectedArea, status]);
+
+  useEffect(() => {
+    const canvas = mapRef.current?.getCanvas();
+    if (canvas) canvas.style.cursor = drawing ? 'crosshair' : '';
+  }, [drawing, status]);
+
+  const flyToPlace = (place: Place) => {
+    const map = mapRef.current;
+    if (!map) return;
+    const radiusKm = 20;
+    commitRef.current('circle', place.center, circleRing(place.center, radiusKm), Math.PI * radiusKm ** 2, place);
+    map.flyTo({ center: place.center, zoom: 8.3, offset: window.innerWidth > 760 ? [200, 0] : [0, -120], duration: 1600, essential: true });
+  };
+
+  const showDemoArea = () => {
+    setShowDemoGrid(true);
+    setLayersOpen(false);
+    mapRef.current?.fitBounds([[MVP_BOUNDS.west, MVP_BOUNDS.south], [MVP_BOUNDS.east, MVP_BOUNDS.north]], { padding: { top: 80, bottom: 80, left: window.innerWidth > 760 ? 440 : 40, right: 40 }, duration: 1400 });
   };
 
   return (
     <div className="map-shell">
-      <div ref={container} className={`map-canvas ${mapStatus !== 'ready' ? 'map-canvas-hidden' : ''}`} aria-label="Interactive ground-motion map" />
-      {mapStatus !== 'ready' && <FallbackGrid cells={cells} error={mapStatus === 'loading' ? null : mapError} />}
-      {mapStatus === 'loading' && <div className="map-loading map-loading-compact" role="status"><i /><strong>Checking WebGL map…</strong><span>The compatibility grid remains interactive while MapLibre verifies its rendered cells.</span></div>}
-      {mapStatus === 'ready' && <div className={`map-brush ${tool === 'navigate' ? 'hidden' : ''}`} style={{ width: brushSize * 2, height: brushSize * 2 }} />}
-      <div className="map-search-control"><span aria-hidden="true">⌖</span><div><strong>Alaska permafrost explorer</strong><small>50–73°N · 176–124°W</small></div><button onClick={() => fitView('focus')} title="Fit the Alaska focus area">Recenter</button></div>
-      <div className="map-view-controls"><button onClick={() => fitView('focus')}>Alaska overview</button><button className="data-view" onClick={() => fitView('data')}><i />Northern Dalton data</button></div>
-      <div className="map-status"><span>FOCUS AREA · (73,−176) (73,−124) (50,−124) (50,−176)</span><b>RED BOX = PROCESSED DATA · ELSEWHERE: NO PROCESSED DATA YET</b><b>SUMMER 2026 · PROVISIONAL</b></div>
-      <div className="map-legend">
-        <span className="legend-title">{layer === 'motion' ? 'Relative motion (cm/yr)' : layer === 'quality' ? 'Measurement Q' : 'Interpretation E'}</span>
-        <div className={`legend-ramp ${layer}`} />
-        <div className="legend-range"><span>{layer === 'motion' ? '−3.5 sinking' : 'low'}</span><span>{layer === 'motion' ? 'stable' : 'high'}</span></div>
-        <small>Opacity shows Q · grey cells excluded</small>
+      <div ref={container} className="map-canvas" aria-label="Interactive map" />
+      {status === 'error' && (
+        <div className="map-error" role="alert">
+          <strong>The interactive map couldn’t start</strong>
+          <span>WebGL is turned off or unavailable in this browser. Try another browser or enable hardware acceleration.</span>
+        </div>
+      )}
+
+      <div className="map-top-left">
+        <MapSearch onPick={flyToPlace} />
+        <button className={`chip ${drawing ? 'active' : ''}`} onClick={() => setDrawing(!drawing)} aria-pressed={drawing}><DrawIcon />Draw area</button>
+      </div>
+
+      {status === 'ready' && !selectedArea && !drawing && <div className="map-hint">Click anywhere on the map to see permafrost insights</div>}
+      {drawing && <div className="map-hint">Click and drag to draw an area <button onClick={() => setDrawing(false)}>Cancel</button></div>}
+
+      <div className="map-controls">
+        {Math.abs(bearing) > 0.5 && <button className="control-button" onClick={() => mapRef.current?.easeTo({ bearing: 0, pitch: 0 })} aria-label="Reset north"><CompassIcon style={{ transform: `rotate(${-bearing}deg)` }} /></button>}
+        <div className="control-stack">
+          <button className="control-button" onClick={() => mapRef.current?.zoomIn()} aria-label="Zoom in"><PlusIcon /></button>
+          <button className="control-button" onClick={() => mapRef.current?.zoomOut()} aria-label="Zoom out"><MinusIcon /></button>
+        </div>
+      </div>
+
+      <div className="map-bottom-left">
+        <button className="basemap-toggle" onClick={() => setBasemap(basemap === 'map' ? 'satellite' : 'map')} aria-label={`Switch to ${basemap === 'map' ? 'satellite' : 'map'} view`}>
+          <span className={`basemap-thumb ${basemap === 'map' ? 'thumb-satellite' : 'thumb-map'}`} />
+          <span className="basemap-label">{basemap === 'map' ? 'Satellite' : 'Map'}</span>
+        </button>
+        <div className="layers-menu">
+          <button className={`control-button ${layersOpen ? 'active' : ''}`} onClick={() => setLayersOpen(!layersOpen)} aria-expanded={layersOpen} aria-label="Map layers"><LayersIcon /></button>
+          {layersOpen && (
+            <div className="layers-popover">
+              <label><input type="checkbox" checked={showDemoGrid} onChange={(event) => setShowDemoGrid(event.target.checked)} /><span>Ground-motion demo grid<small>Northern Dalton corridor · synthetic</small></span></label>
+              <button className="link-button" onClick={showDemoArea}>Go to demo area</button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
-}
-
-function FallbackGrid({ cells, error }: { cells: Collection<DemoCellProperties>; error: string | null }) {
-  const tool = useAppStore((state) => state.tool);
-  const layer = useAppStore((state) => state.layer);
-  const highQualityOnly = useAppStore((state) => state.highQualityOnly);
-  const selectedIds = useAppStore((state) => state.selectedCellIds);
-  const selected = new Set(selectedIds);
-  const tiles = referenceTiles(7);
-  const interact = (cell: DemoCellProperties) => {
-    if (tool === 'select') useAppStore.getState().addSelectedCells([cell.id]);
-    if (tool === 'deselect') useAppStore.getState().removeSelectedCells([cell.id]);
-    useAppStore.getState().setFocusedCellId(cell.id);
-  };
-  const color = (cell: DemoCellProperties) => {
-    if (cell.excluded) return '#657174';
-    if (layer === 'quality') return cell.q >= 0.75 ? '#b8dfc4' : cell.q >= 0.5 ? '#bd8e5d' : '#5b354a';
-    if (layer === 'interpretation') return cell.e >= 0.75 ? '#efd184' : cell.e >= 0.5 ? '#9278ab' : '#43345c';
-    return cell.motion_cm_yr < -2 ? '#d95f4f' : cell.motion_cm_yr < -1 ? '#e7b55c' : '#63aebf';
-  };
-
-  return (
-    <div className="fallback-map" role="region" aria-label="Interactive grid-map fallback">
-      <div className="fallback-real-tiles" style={{ gridTemplateColumns: `repeat(${tiles.columns}, 1fr)`, gridTemplateRows: `repeat(${tiles.rows}, 1fr)` }} aria-hidden="true">
-        {tiles.items.map((tile) => <img key={`${tile.x}-${tile.y}`} src={`https://tile.openstreetmap.org/${tile.z}/${tile.x}/${tile.y}.png`} alt="" />)}
-      </div>
-      <div className="fallback-context" aria-hidden="true"><span className="fallback-river river-one" /><span className="fallback-river river-two" /><b>BEAUFORT SEA</b><em>DALTON HWY</em></div>
-      <div className="fallback-grid">
-        {cells.features.map(({ properties }) => {
-          const hidden = highQualityOnly && properties.q < 0.75;
-          return <button key={properties.id} aria-label={`${properties.area_name}, ${properties.latitude.toFixed(4)} north, ${Math.abs(properties.longitude).toFixed(4)} west, motion ${properties.motion_cm_yr} centimetres per year`} title={properties.exclusion_reason ?? `${properties.latitude.toFixed(4)}°N, ${Math.abs(properties.longitude).toFixed(4)}°W · ${properties.motion_cm_yr} cm/yr · Q ${properties.q.toFixed(2)} · E ${properties.e.toFixed(2)}`} className={`${properties.excluded ? 'excluded' : ''} ${selected.has(properties.id) ? 'selected' : ''} ${hidden ? 'filtered' : ''}`} style={{ backgroundColor: color(properties), opacity: properties.excluded ? .16 : Math.max(.18, properties.q * .62) }} onClick={() => interact(properties)} />;
-        })}
-      </div>
-      <div className="fallback-road" aria-hidden="true" />
-      <div className="fallback-pipeline" aria-hidden="true" />
-      <div className="fallback-message"><strong>{error ? 'Compatibility map active' : 'Analysis grid ready'}</strong><span>{error ? `${error} The same data, layers, selection and cell inspection remain available.` : 'MapLibre is being verified. You can use this grid immediately.'}</span></div>
-      <a className="fallback-attribution" href={BASEMAP.attributionUrl} target="_blank" rel="noreferrer">© OpenStreetMap contributors</a>
-    </div>
-  );
-}
-
-function referenceTiles(zoom: number) {
-  const longitudeTile = (longitude: number) => Math.floor(((longitude + 180) / 360) * 2 ** zoom);
-  const latitudeTile = (latitude: number) => {
-    const radians = latitude * Math.PI / 180;
-    return Math.floor((1 - Math.asinh(Math.tan(radians)) / Math.PI) / 2 * 2 ** zoom);
-  };
-  const minX = longitudeTile(MVP_BOUNDS.west);
-  const maxX = longitudeTile(MVP_BOUNDS.east);
-  const minY = latitudeTile(MVP_BOUNDS.north);
-  const maxY = latitudeTile(MVP_BOUNDS.south);
-  const items = [];
-  for (let y = minY; y <= maxY; y += 1) {
-    for (let x = minX; x <= maxX; x += 1) items.push({ z: zoom, x, y });
-  }
-  return { items, columns: maxX - minX + 1, rows: maxY - minY + 1 };
 }

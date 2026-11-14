@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import type { AppMode, ToolMode } from './types';
+import type { BasemapId } from './config/map';
+import type { SelectedArea } from './lib/geo';
 
 export type LayerId = 'motion' | 'quality' | 'interpretation';
 
@@ -16,6 +18,11 @@ interface AppState {
   selectedCellIds: string[];
   focusedCellId: string | null;
   analysisOpen: boolean;
+  basemap: BasemapId;
+  drawing: boolean;
+  selectedArea: SelectedArea | null;
+  phenomenon: string;
+  showDemoGrid: boolean;
   setMode: (mode: AppMode) => void;
   setActiveChapter: (chapter: number) => void;
   setTool: (tool: ToolMode) => void;
@@ -30,6 +37,12 @@ interface AppState {
   clearSelection: () => void;
   setFocusedCellId: (id: string | null) => void;
   setAnalysisOpen: (open: boolean) => void;
+  setBasemap: (basemap: BasemapId) => void;
+  setDrawing: (drawing: boolean) => void;
+  setSelectedArea: (area: SelectedArea | null) => void;
+  renameSelectedArea: (id: string, name: string, region: string) => void;
+  setPhenomenon: (id: string) => void;
+  setShowDemoGrid: (show: boolean) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -45,6 +58,11 @@ export const useAppStore = create<AppState>((set) => ({
   selectedCellIds: [],
   focusedCellId: null,
   analysisOpen: false,
+  basemap: 'map',
+  drawing: false,
+  selectedArea: null,
+  phenomenon: 'permafrost',
+  showDemoGrid: false,
   setMode: (mode) => set({ mode }),
   setActiveChapter: (activeChapter) => set({ activeChapter }),
   setTool: (tool) => set({ tool }),
@@ -65,4 +83,10 @@ export const useAppStore = create<AppState>((set) => ({
   clearSelection: () => set({ selectedCellIds: [], focusedCellId: null }),
   setFocusedCellId: (focusedCellId) => set({ focusedCellId }),
   setAnalysisOpen: (analysisOpen) => set({ analysisOpen }),
+  setBasemap: (basemap) => set({ basemap }),
+  setDrawing: (drawing) => set({ drawing }),
+  setSelectedArea: (selectedArea) => set((state) => ({ selectedArea, analysisOpen: selectedArea ? state.analysisOpen : false })),
+  renameSelectedArea: (id, name, region) => set((state) => (state.selectedArea?.id === id ? { selectedArea: { ...state.selectedArea, name, region } } : state)),
+  setPhenomenon: (phenomenon) => set({ phenomenon }),
+  setShowDemoGrid: (showDemoGrid) => set({ showDemoGrid }),
 }));

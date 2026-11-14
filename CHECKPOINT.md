@@ -88,3 +88,15 @@ Completed after the real-map overlay:
 - Added an automated selection-insight test covering the three impact summaries and optional drawer action.
 - Verification: production build passes; frontend tests pass 6/6 across 3 test files.
 - No files were deleted or replaced; `recycle/` remains available if a future removal is required.
+
+## Google-Maps-style map revamp (2026-11-14)
+
+- Root cause of the unusable map: MapLibre 6 resolves its web worker relative to its own module; Vite dependency pre-bundling broke that path, so the WebGL map never started and the app always showed the fake "compatibility grid". Fixed with `maplibregl.setWorkerUrl()` pointing at the shipped worker (`maplibre-gl-worker.mjs?url`).
+- New full-bleed map: OpenFreeMap Liberty vector basemap (no API key) and an Esri World Imagery satellite view with the vector roads/labels on top (hybrid). Globe projection at low zoom. Google-style search (local permafrost places + Nominatim on Enter), zoom/compass controls, Map/Satellite thumbnail toggle, layers menu (Northern Dalton demo grid, off by default).
+- Selection: click anywhere selects a circle scaled to the zoom level; "Draw area" drags a box. Areas are reverse-geocoded for a readable name.
+- Insights panel (left): permafrost metrics + Safety/Health/Economy impact rows, "View detailed insights" opens the right drawer, and a bottom "Climate phenomenon" toggle. Non-permafrost phenomena show "Coming soon… View other parameters!" on the map.
+- All numbers in the panel/drawer come from `src/lib/placeholderInsights.ts` (deterministic sample values, labelled as such). Replace that module when real products are processed.
+- UI restyled to a clean light theme; all eyebrow/kicker labels removed. Demo-data notice is now a header chip.
+- Windows Application Control blocks Rollup's native binary in this folder, so `rollup` is aliased to `@rollup/wasm-node` (devDependency + override). The previous lockfile is in `recycle/package-lock.native-rollup.json`; pre-revamp copies of replaced files are in `recycle/pre-map-revamp/`.
+- `ToolDock`, `SelectionInsight` and `AnalysisSidebar` are no longer rendered but are kept in place.
+- Verification: `npm test` 9/9 passing; `npm run build` passing; checked in Chrome (map, search, click/draw selection, satellite, drawer, coming-soon, Story, About).

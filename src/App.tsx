@@ -36,15 +36,14 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <DemoBanner />
       <header className="app-header">
-        <button className="brand" onClick={() => setMode('story')} aria-label="Ground Truth North home"><span className="brand-mark"><i /><i /></span><span><b>GROUND TRUTH</b><em>NORTH</em></span></button>
+        <button className="brand" onClick={() => setMode('explore')} aria-label="Ground Truth North home"><span className="brand-mark" aria-hidden="true" /><span>Ground Truth North</span></button>
         <nav aria-label="Primary navigation">
+          <button className={mode === 'explore' ? 'active' : ''} onClick={() => setMode('explore')}>Map</button>
           <button className={mode === 'story' ? 'active' : ''} onClick={() => setMode('story')}>Story</button>
-          <button className={mode === 'explore' ? 'active' : ''} onClick={() => setMode('explore')}>Explore</button>
-          <button className={mode === 'about' ? 'active' : ''} onClick={() => setMode('about')}>About the data</button>
+          <button className={mode === 'about' ? 'active' : ''} onClick={() => setMode('about')}>About</button>
         </nav>
-        <div className="header-status"><span className="status-dot" />SUMMER 2026 <b>PROVISIONAL</b></div>
+        <DemoBanner />
       </header>
       {error ? <main className="loading-state"><h1>Demo layers could not load</h1><p>{error}</p><p>Run <code>npm run demo:generate</code>, then restart the app.</p></main> : !data ? <main className="loading-state"><div className="loading-orbit" /><p>Loading the evidence ledger…</p></main> : mode === 'story' ? <StoryMode /> : <Suspense fallback={<main className="loading-state"><div className="loading-orbit" /><p>Opening the analysis workspace…</p></main>}>{mode === 'explore' ? <ExploreMode cells={data.cells} segments={data.segments} series={data.series} /> : <AboutData manifest={data.manifest} />}</Suspense>}
     </div>

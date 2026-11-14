@@ -23,7 +23,7 @@ export function ToolDock() {
   return (
     <aside className="tool-dock" aria-label="Map and timeframe controls">
       <div className="tool-group">
-        <span className="tool-heading">CURSOR</span>
+        
         <div className="tool-buttons">
           {tools.map((item) => <button key={item.id} className={tool === item.id ? 'active' : ''} onClick={() => setTool(item.id)} aria-label={item.label} title={item.label}>{item.symbol}</button>)}
         </div>
@@ -32,13 +32,13 @@ export function ToolDock() {
       </div>
 
       <div className="tool-group timeframe-controls">
-        <span className="tool-heading">TIMEFRAME</span>
+        
         <label>Start year<select value={startYear} onChange={(event) => setStartYear(Number(event.target.value))}>{Array.from({ length: 11 }, (_, index) => 2016 + index).map((year) => <option key={year}>{year}</option>)}</select></label>
         <label>End year<select value={endYear} onChange={(event) => setEndYear(Number(event.target.value))}>{Array.from({ length: 11 }, (_, index) => 2016 + index).map((year) => <option key={year}>{year}</option>)}</select></label>
       </div>
 
       <div className="tool-group season-controls">
-        <span className="tool-heading">GROUND-MOTION SEASON</span>
+        
         {['spring', 'summer', 'autumn', 'winter'].map((season) => (
           <label key={season} className={season !== 'summer' ? 'disabled' : ''} title={season !== 'summer' ? 'Snow cover and freeze–thaw make radar motion unreliable.' : 'Quality-screened snow-free pairs'}>
             <input type="checkbox" disabled={season !== 'summer'} checked={seasons.includes(season)} onChange={() => toggleSeason(season)} />{season}

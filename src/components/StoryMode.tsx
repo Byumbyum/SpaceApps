@@ -14,7 +14,7 @@ export function StoryMode() {
     <main id="main-content" className="story-page">
       <section className="story-hero">
         <div className="story-hero-copy">
-          <span className="eyebrow">NASA–ISRO RADAR · NORTHERN ALASKA</span>
+          
           <h1>When frozen ground<br /><em>starts to move.</em></h1>
           <p className="objective">We identify and explain radar-observed ground changes that may indicate emerging permafrost-related hazards, and show clearly which observations are trustworthy.</p>
           <div className="hero-actions">
@@ -37,7 +37,7 @@ export function StoryMode() {
         <article className="chapter-card" key={chapter.number}>
           <div className="chapter-copy">
             <div className="chapter-meta"><span>{chapter.number} / 09</span><EvidenceTag kind={chapter.evidence} /></div>
-            <span className="eyebrow">{chapter.kicker}</span>
+            
             <h2>{chapter.title}</h2>
             <p className="chapter-summary">{chapter.summary}</p>
             <div className="evidence-split">
