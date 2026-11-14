@@ -1,0 +1,114 @@
+[
+  {
+    "id": "fairbanks",
+    "label": "Fairbanks, Alaska",
+    "base": "/data/nisar",
+    "corners": [
+      [
+        -147.88515,
+        64.67244
+      ],
+      [
+        -148.05415,
+        64.98492
+      ],
+      [
+        -147.61448,
+        65.02729
+      ],
+      [
+        -147.4508,
+        64.71422
+      ]
+    ],
+    "firstDate": "2026-06-17",
+    "lastDate": "2026-08-31",
+    "passCount": 37,
+    "changeTracks": 6,
+    "note": null
+  },
+  {
+    "id": "blatten",
+    "label": "Lötschental (Blatten), Swiss Alps",
+    "base": "/data/nisar/blatten",
+    "corners": [
+      [
+        7.84526,
+        46.52993
+      ],
+      [
+        7.96956,
+        46.41635
+      ],
+      [
+        7.80479,
+        46.33006
+      ],
+      [
+        7.68029,
+        46.44332
+      ]
+    ],
+    "firstDate": "2026-06-19",
+    "lastDate": "2026-09-28",
+    "passCount": 29,
+    "changeTracks": 4,
+    "note": "Mountain site: summer radar change here is dominated by snow and glacier melt, so it is not a permafrost signal on its own."
+  },
+  {
+    "id": "hohe-tauern",
+    "label": "Grossglockner, Austrian Alps",
+    "base": "/data/nisar/hohe-tauern",
+    "corners": [
+      [
+        12.75727,
+        47.17625
+      ],
+      [
+        12.86597,
+        47.05836
+      ],
+      [
+        12.69281,
+        46.98373
+      ],
+      [
+        12.58379,
+        47.10133
+      ]
+    ],
+    "firstDate": "2026-06-22",
+    "lastDate": "2026-09-30",
+    "passCount": 15,
+    "changeTracks": 1,
+    "note": "Mountain site: summer radar change here is dominated by snow and glacier melt, so it is not a permafrost signal on its own."
+  },
+  {
+    "id": "gyirong",
+    "label": "Gyirong (Rasuwa outburst flood), Tibet",
+    "base": "/data/nisar/gyirong",
+    "corners": [
+      [
+        85.66771,
+        28.47314
+      ],
+      [
+        85.37418,
+        28.16924
+      ],
+      [
+        85.03274,
+        28.42466
+      ],
+      [
+        85.3257,
+        28.7309
+      ]
+    ],
+    "firstDate": "2026-06-08",
+    "lastDate": "2026-09-28",
+    "passCount": 24,
+    "changeTracks": 5,
+    "note": "Mountain site: summer radar change here is dominated by snow and glacier melt, so it is not a permafrost signal on its own."
+  }
+]

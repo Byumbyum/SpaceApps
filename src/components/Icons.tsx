@@ -25,3 +25,4 @@ export const CoinIcon = (props: IconProps) => <Icon {...props}><circle cx="12" c
 export const SnowIcon = (props: IconProps) => <Icon {...props}><path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9M9.5 4.5 12 7l2.5-2.5M9.5 19.5 12 17l2.5 2.5" /></Icon>;
 export const LayersIcon = (props: IconProps) => <Icon {...props}><path d="m12 4 8.5 4.5L12 13 3.5 8.5z" /><path d="m3.5 12.5 8.5 4.5 8.5-4.5M3.5 16.5 12 21l8.5-4.5" /></Icon>;
 export const PanelIcon = (props: IconProps) => <Icon {...props}><rect x="3.5" y="4.5" width="17" height="15" rx="2" /><path d="M14.5 4.5v15" /></Icon>;
+export const SatelliteIcon = (props: IconProps) => <Icon {...props}><path d="m9 9 6 6" /><rect x="10.2" y="5.2" width="4" height="9" rx="1" transform="rotate(45 12.2 9.7)" /><path d="M5 13a6 6 0 0 0 6 6M5 17a2 2 0 0 0 2 2M15.5 3.5l2-2M20.5 8.5l2-2" /></Icon>;

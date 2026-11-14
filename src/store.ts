@@ -4,6 +4,7 @@ import type { BasemapId } from './config/map';
 import type { SelectedArea } from './lib/geo';
 
 export type LayerId = 'motion' | 'quality' | 'interpretation';
+export type NisarLayer = 'none' | 'radar' | 'change' | 'landcover';
 
 interface AppState {
   mode: AppMode;
@@ -23,6 +24,7 @@ interface AppState {
   selectedArea: SelectedArea | null;
   phenomenon: string;
   showDemoGrid: boolean;
+  nisarLayer: NisarLayer;
   setMode: (mode: AppMode) => void;
   setActiveChapter: (chapter: number) => void;
   setTool: (tool: ToolMode) => void;
@@ -43,6 +45,7 @@ interface AppState {
   renameSelectedArea: (id: string, name: string, region: string) => void;
   setPhenomenon: (id: string) => void;
   setShowDemoGrid: (show: boolean) => void;
+  setNisarLayer: (layer: NisarLayer) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -63,6 +66,7 @@ export const useAppStore = create<AppState>((set) => ({
   selectedArea: null,
   phenomenon: 'permafrost',
   showDemoGrid: false,
+  nisarLayer: 'change',
   setMode: (mode) => set({ mode }),
   setActiveChapter: (activeChapter) => set({ activeChapter }),
   setTool: (tool) => set({ tool }),
@@ -89,4 +93,5 @@ export const useAppStore = create<AppState>((set) => ({
   renameSelectedArea: (id, name, region) => set((state) => (state.selectedArea?.id === id ? { selectedArea: { ...state.selectedArea, name, region } } : state)),
   setPhenomenon: (phenomenon) => set({ phenomenon }),
   setShowDemoGrid: (showDemoGrid) => set({ showDemoGrid }),
+  setNisarLayer: (nisarLayer) => set({ nisarLayer }),
 }));

@@ -104,3 +104,53 @@ export interface SegmentProperties {
   priority: 'higher' | 'moderate' | 'lower' | 'insufficient';
   valid_coverage: number;
 }
+
+export interface GcovPass {
+  date: string;
+  track: string;
+  direction: 'ascending' | 'descending';
+  resolution: string;
+  polarization: string;
+  valid_fraction: number;
+}
+
+export interface GcovCell {
+  id: string;
+  center: [number, number];
+  hh: Array<number | null>;
+  hv: Array<number | null>;
+  water: Array<number | null>;
+  /** [WorldCover class, 40 m blocks, mean summer change dB] — permanent water excluded. */
+  lc?: Array<[number, number, number | null]>;
+}
+
+/** One processed NISAR site from public/data/nisar/sites.json. */
+export interface NisarSite {
+  id: string;
+  label: string;
+  /** URL folder holding gcov.json and the PNG overlays. */
+  base: string;
+  corners: [[number, number], [number, number], [number, number], [number, number]];
+  firstDate: string;
+  lastDate: string;
+  passCount: number;
+  changeTracks: number;
+  note: string | null;
+}
+
+export interface GcovData {
+  product: string;
+  maturity: 'PROVISIONAL';
+  quantity: string;
+  generated_at: string;
+  site?: { id: string; label: string; bbox: number[]; note: string | null };
+  corners: [[number, number], [number, number], [number, number], [number, number]];
+  gap: [string, string];
+  landcover?: { source: string; excluded: number[]; classes: Record<string, { label: string; color: string }> } | null;
+  water_threshold_db: number;
+  composite_date: string;
+  composite_track: string;
+  tracks_in_change_map: number;
+  passes: GcovPass[];
+  cells: GcovCell[];
+}

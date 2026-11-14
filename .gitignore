@@ -7,3 +7,11 @@ __pycache__/
 *.py[cod]
 .venv/
 inventory.json
+
+# Large raw satellite products (keep local)
+data/raw/
+
+# Secrets (NASA Earthdata token)
+.env
+.env.*
+!.env.example

@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { DemoBanner } from './components/DemoBanner';
 import { StoryMode } from './components/StoryMode';
 import { useAppStore } from './store';
-import type { DemoCellProperties, DemoManifest, SegmentProperties, TimePoint } from './types';
+import type { DemoCellProperties, DemoManifest, NisarSite, SegmentProperties, TimePoint } from './types';
 
 type Feature<P> = { type: 'Feature'; id?: number; properties: P; geometry: unknown };
 type Collection<P> = { type: 'FeatureCollection'; features: Array<Feature<P>> };
@@ -12,6 +12,7 @@ interface AppData {
   cells: Collection<DemoCellProperties>;
   segments: Collection<SegmentProperties>;
   series: TimePoint[];
+  sites: NisarSite[];
 }
 
 const ExploreMode = lazy(() => import('./components/ExploreMode').then((module) => ({ default: module.ExploreMode })));
@@ -29,8 +30,10 @@ export default function App() {
       fetch('/data/cells.geojson').then((response) => response.json() as Promise<Collection<DemoCellProperties>>),
       fetch('/data/segments.geojson').then((response) => response.json() as Promise<Collection<SegmentProperties>>),
       fetch('/data/time-series.json').then((response) => response.json() as Promise<TimePoint[]>),
+      // Processed NISAR sites; optional so the app still runs before `npm run data:gcov`.
+      fetch('/data/nisar/sites.json').then((response) => (response.ok ? (response.json() as Promise<NisarSite[]>) : [])).catch(() => []),
     ])
-      .then(([manifest, cells, segments, series]) => setData({ manifest, cells, segments, series }))
+      .then(([manifest, cells, segments, series, sites]) => setData({ manifest, cells, segments, series, sites }))
       .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : 'Unable to load demo layers'));
   }, []);
 
@@ -45,7 +48,7 @@ export default function App() {
         </nav>
         <DemoBanner />
       </header>
-      {error ? <main className="loading-state"><h1>Demo layers could not load</h1><p>{error}</p><p>Run <code>npm run demo:generate</code>, then restart the app.</p></main> : !data ? <main className="loading-state"><div className="loading-orbit" /><p>Loading the evidence ledger…</p></main> : mode === 'story' ? <StoryMode /> : <Suspense fallback={<main className="loading-state"><div className="loading-orbit" /><p>Opening the analysis workspace…</p></main>}>{mode === 'explore' ? <ExploreMode cells={data.cells} segments={data.segments} series={data.series} /> : <AboutData manifest={data.manifest} />}</Suspense>}
+      {error ? <main className="loading-state"><h1>Demo layers could not load</h1><p>{error}</p><p>Run <code>npm run demo:generate</code>, then restart the app.</p></main> : !data ? <main className="loading-state"><div className="loading-orbit" /><p>Loading the evidence ledger…</p></main> : mode === 'story' ? <StoryMode /> : <Suspense fallback={<main className="loading-state"><div className="loading-orbit" /><p>Opening the analysis workspace…</p></main>}>{mode === 'explore' ? <ExploreMode cells={data.cells} series={data.series} sites={data.sites} /> : <AboutData manifest={data.manifest} />}</Suspense>}
     </div>
   );
 }

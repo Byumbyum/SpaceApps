@@ -9,7 +9,10 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "demo:generate": "python demo/generate_demo.py"
+    "demo:generate": "python demo/generate_demo.py",
+    "data:gcov": "node --env-file-if-exists=../.env --env-file-if-exists=.env --max-old-space-size=4096 scripts/process-gcov.mjs",
+    "data:gcov:local": "node --max-old-space-size=4096 scripts/process-gcov.mjs --source=local",
+    "data:sites": "node scripts/lib/site-index.mjs"
   },
   "dependencies": {
     "maplibre-gl": "^6.18.0",
@@ -24,11 +27,13 @@
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react": "^5.1.1",
+    "geotiff": "^2.1.3",
     "jsdom": "^27.2.0",
+    "pngjs": "^7.0.0",
+    "rollup": "npm:@rollup/wasm-node@4.68.3",
     "typescript": "~5.9.3",
     "vite": "^7.2.2",
-    "vitest": "^4.0.9",
-    "rollup": "npm:@rollup/wasm-node@4.68.3"
+    "vitest": "^4.0.9"
   },
   "overrides": {
     "rollup": "$rollup"

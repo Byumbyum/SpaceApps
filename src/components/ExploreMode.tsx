@@ -1,4 +1,5 @@
-import type { DemoCellProperties, SegmentProperties, TimePoint } from '../types';
+import type { DemoCellProperties, NisarSite, TimePoint } from '../types';
+import { useSiteGcov } from '../lib/nisarSites';
 import { PHENOMENA } from '../lib/phenomena';
 import { useAppStore } from '../store';
 import { AreaInsights } from './AreaInsights';
@@ -8,7 +9,9 @@ import { MapPanel } from './MapPanel';
 type Feature<P> = { type: 'Feature'; id?: number; properties: P; geometry: unknown };
 type Collection<P> = { type: 'FeatureCollection'; features: Array<Feature<P>> };
 
-export function ExploreMode({ cells, segments, series }: { cells: Collection<DemoCellProperties>; segments: Collection<SegmentProperties>; series: TimePoint[] }) {
+export function ExploreMode({ cells, series, sites }: { cells: Collection<DemoCellProperties>; series: TimePoint[]; sites: NisarSite[] }) {
+  // NISAR results for the site the selected area falls in, loaded on demand.
+  const { site, gcov } = useSiteGcov(sites);
   const phenomenon = useAppStore((state) => state.phenomenon);
   const setPhenomenon = useAppStore((state) => state.setPhenomenon);
   const hasPanel = useAppStore((state) => state.selectedArea !== null);
@@ -17,9 +20,9 @@ export function ExploreMode({ cells, segments, series }: { cells: Collection<Dem
 
   return (
     <main id="main-content" className={`explore-page ${hasPanel ? 'has-panel' : ''} ${drawerOpen ? 'has-drawer' : ''}`}>
-      <MapPanel cells={cells} segments={segments} />
-      <AreaInsights />
-      <InsightsDrawer series={series} />
+      <MapPanel cells={cells} sites={sites} site={site} gcov={gcov} />
+      <AreaInsights gcov={gcov} />
+      <InsightsDrawer series={series} gcov={gcov} />
       {active && !active.available && (
         <div className="coming-soon" role="status">
           <h2>Coming soon…</h2>
