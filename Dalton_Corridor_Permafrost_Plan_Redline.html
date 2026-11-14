@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dalton Corridor Permafrost Plan · Defensibility Review (redline)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@112,800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE work document: a team analysis plan, conclusion first, then reference
+   IDEA a field survey report from the Arctic: route of stations, ruled tables, map-legend tags
+   PICTURE the cause-and-effect loop as one bold route of stations across the first screen
+   COLOUR peat-dark ground for the opening band, ice blue for radar, thaw coral for impacts, white body
+   TYPE Archivo expanded 800 for titles + Inter for text
+   LAYOUT title and conclusion across the top, loop route full width beneath; phone stacks stations */
+:root{color-scheme:light dark;--bg:light-dark(#ffffff,#121110);--ink:light-dark(#191714,#ece8e1);--mute:light-dark(#5f5a52,#a8a196);--rule:light-dark(#dcd7cf,#34302b);--panel:light-dark(#f4f2ee,#1c1a17);--peat:#221e19;--peat-ink:#f1ece4;--ice:light-dark(#0b6b8a,#7fcbe3);--ice-bg:light-dark(#e3f2f7,#12303a);--thaw:light-dark(#c8432a,#ff8a70);--thaw-bg:light-dark(#fbe9e4,#3a1d17);--moss:light-dark(#4d6b2a,#a9cf7c);--moss-bg:light-dark(#edf3e4,#1f2a14)}
+:root[data-theme=light]{color-scheme:light}
+:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.6 Inter,system-ui,sans-serif;overflow-x:clip}
+.band{padding-block:clamp(28px,4vw,56px);padding-inline:max(5vw,16px)}
+.wrap{max-width:1240px;margin:0 auto}
+h1,h2{font-family:Archivo,Inter,sans-serif;font-stretch:112%;font-weight:800;letter-spacing:-.02em;line-height:1.05;text-wrap:balance;margin:0 0 14px}
+h1{font-size:clamp(32px,5vw,50px)}
+h2{font-size:clamp(24px,3vw,32px);margin-top:4px}
+h3{font-size:17px;margin:22px 0 8px;font-weight:600}
+p{max-width:72ch;margin:0 0 12px}
+.hero{background:var(--peat);color:var(--peat-ink)}
+.hero p{color:#d8d1c6;font-size:17px}
+.hero .lede{font-size:clamp(18px,2vw,21px);color:var(--peat-ink);max-width:62ch}
+.route{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:0;margin-top:30px;position:relative}
+.st{position:relative;padding:14px 12px 16px;border-top:6px solid #7fcbe3;margin-right:10px}
+.st.h{border-color:#ff8a70}.st.g{border-color:#c2b59b}
+.st b{display:block;font-size:15px;color:#fff;margin-bottom:4px}
+.st span{font-size:13px;color:#c9c1b4;line-height:1.45;display:block}
+.st i{font-style:normal;font-size:12px;display:inline-block;margin-top:8px;padding:1px 7px;border-radius:4px;background:#3a332b;color:#e9e2d6}
+.st i.y{background:#7fcbe3;color:#082a35}
+.st::after{content:"";position:absolute;top:-11px;right:-12px;border:8px solid transparent;border-left:10px solid #7fcbe3}
+.st.h::after{border-left-color:#ff8a70}.st.g::after{border-left-color:#c2b59b}
+.st:last-child::after{display:none}
+.loopnote{font-size:13px;color:#b8afa2;margin-top:10px}
+.key{display:flex;flex-wrap:wrap;gap:16px;font-size:13px;color:#c9c1b4;margin-top:18px}
+.key em{font-style:normal;display:inline-block;width:22px;height:6px;margin-right:6px;vertical-align:middle}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px}
+.card{background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:16px 18px}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--mute);border-bottom:2px solid var(--ink);padding:8px 10px 6px}
+td{border-bottom:1px solid var(--rule);padding:9px 10px;vertical-align:top}
+td:first-child{font-weight:600}
+.nw{white-space:nowrap}
+.tag{display:inline-block;font-size:12px;border-radius:4px;padding:0 6px;margin:0 4px 4px 0;white-space:nowrap;font-weight:500}
+.tn{background:var(--ice-bg);color:var(--ice)}
+.to{border:1px solid var(--rule);color:var(--mute)}
+.tl{background:var(--thaw-bg);color:var(--thaw)}
+.sec{border-top:1px solid var(--rule)}
+.eq{background:var(--panel);border-left:0;border-radius:8px;padding:12px 16px;margin:10px 0 14px;font-size:19px;overflow-x:auto}
+.eq small{display:block;font-size:13px;color:var(--mute);margin-top:4px;font-family:Inter,sans-serif}
+math{font-size:1.05em}
+.tl-row{display:grid;grid-template-columns:150px minmax(0,1fr);gap:12px;align-items:center;margin:8px 0}
+.tl-row b{font-size:14px}
+.tl-track{position:relative;height:30px;background:var(--panel);border-radius:4px}
+.tl-bar{position:absolute;top:0;bottom:0;border-radius:4px;display:flex;align-items:center;padding:0 8px;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden}
+.c-band{background:#c2b59b;color:#2a241c}
+.l-band{background:var(--ice);color:#fff}
+.n-band{background:var(--thaw);color:#fff}
+.tl-axis{display:grid;grid-template-columns:150px minmax(0,1fr);gap:12px;font-size:12px;color:var(--mute)}
+.tl-axis div:last-child{display:flex;justify-content:space-between}
+.thread{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-bottom:6px}
+.thread .c{background:var(--panel);border:1px solid var(--rule);border-radius:8px;padding:8px 10px;font-size:13px;line-height:1.45}
+.thread .c.ins{background:var(--moss-bg);color:var(--moss);border-color:transparent;font-weight:500}
+.thead{font-size:13px;font-weight:600;color:var(--mute);border-bottom:2px solid var(--ink);padding-bottom:4px}
+.tname{font-weight:600;font-size:15px;margin:18px 0 6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.site{font-size:12px;font-weight:500;color:var(--mute);border:1px solid var(--rule);border-radius:4px;padding:0 6px}
+.horiz{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px}
+.hz{border-top:6px solid var(--thaw);padding-top:12px}
+.hz.long{border-color:var(--ice)}
+ul{margin:0 0 12px;padding-left:20px;max-width:72ch}
+li{margin-bottom:6px}
+.src li{font-size:14px}
+a{color:var(--ice)}
+.note{font-size:13px;color:var(--mute)}
+@media(max-width:900px){.route{grid-template-columns:repeat(4,minmax(0,1fr));row-gap:18px}.st:nth-child(4)::after{display:none}}
+@media(max-width:760px){.grid2,.horiz{grid-template-columns:minmax(0,1fr)}.thread{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.thread .c.ins{grid-column:1/-1}.thead.hide{display:none}}
+@media(max-width:600px){.route{grid-template-columns:minmax(0,1fr)}.st{margin-right:0}.st::after{display:none}table{font-size:13px}th,td{padding:6px 4px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px;border-bottom:1px solid var(--rule)}.stack td{display:flex;justify-content:space-between;gap:12px;border:0;padding:3px 0}.stack td::before{content:attr(data-l);color:var(--mute);font-weight:500;flex:0 0 36%}.stack td:first-child::before{content:none}.tl-row,.tl-axis{grid-template-columns:90px minmax(0,1fr)}.thread{grid-template-columns:minmax(0,1fr)}.thead{display:none}}
+
+/* REVIEW MARKUP · all revised claims / methodology / dynamic table cells are red. */
+.revision{color:light-dark(#b62230,#ff9e9c);background:light-dark(rgba(194,31,48,.065),rgba(255,120,120,.075));text-decoration:none;border-bottom:1px solid currentColor;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.hero .revision{color:#ffb8b1;background:rgba(252,100,90,.13)}
+.revision-block{padding:12px 16px;border-left:3px solid #c84340;background:light-dark(#fff5f4,#2c1b1c);margin:12px 0 18px;border-radius:0 7px 7px 0}
+.revision-block .revision{background:transparent}
+.review-ledger{background:light-dark(#fff8f6,#2a211f);border-top:4px solid #c84340}
+.review-ledger h2{margin-bottom:12px}
+.review-ledger ul{max-width:none;columns:2;column-gap:34px}
+.review-ledger li{break-inside:avoid}
+.flag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.045em;vertical-align:baseline;padding:1px 6px;border-radius:3px;border:1px solid currentColor}
+.flag.obs{color:var(--ice)}.flag.inf{color:var(--thaw)}.flag.lit{color:var(--moss)}
+@media(max-width:760px){.review-ledger ul{columns:1}}
+@media print{.revision{color:#af2330!important;background:transparent!important;border-bottom:1px solid #af2330!important}.hero{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+</style>
+</head>
+<body>
+
+<header class="band hero">
+<div class="wrap">
+<h1><ins class="revision">Ground motion on the Dalton corridor: a NISAR investigation of thaw, people and potential risk</ins></h1>
+<p class="lede"><ins class="revision">Historical radar studies document seasonal ground motion and post-fire subsidence in Arctic Alaska. We will test three contrasting landscapes—relatively undisturbed tundra, the Anaktuvuk burn area, and a developed highway/oilfield corridor—against newer NISAR observations. NISAR’s L-band may preserve coherence in some vegetated areas; we will measure that advantage rather than assume it.</ins></p>
+<p>NASA Space Apps Challenge 2026 · "Dancing with the SARs". Team analysis plan: datasets, methods, visuals and the claims each one supports. <ins class="revision">This is an ambitious build plan: all proposed analytical threads remain, but planned findings are explicitly hypotheses until verified.</ins></p>
+<div class="route" aria-label="Cause and effect loop">
+<div class="st h"><b>1. Human activity</b><span>Greenhouse gas emissions</span><i>Published research</i></div>
+<div class="st"><b>2. Warming</b><span>The Arctic warms faster; summers build more thaw</span><i class="y">Our analysis</i></div>
+<div class="st g"><b>3. Ground thaws</b><span><ins class="revision">Seasonal thaw may cause reversible ground motion; persistent ice loss may leave residual subsidence</ins></span><i class="y">Our analysis</i></div>
+<div class="st g"><b>4. Wildfire</b><span><ins class="revision">A parallel disturbance: burning can reduce insulation and accelerate thaw</ins></span><i>Published research + test</i></div>
+<div class="st h"><b>5. Safety</b><span><ins class="revision">Potential differential settlement near roads, pipelines and buildings</ins></span><i class="y">Our screening</i></div>
+<div class="st h"><b>6. Cost and health</b><span>Repair bills; failing ice cellars and food storage</span><i>Published research</i></div>
+<div class="st"><b>7. Carbon</b><span>Thawed soil releases CO₂ and methane, driving more warming</span><i>Published research</i></div>
+</div>
+<p class="loopnote">Station 7 feeds back into station 2, closing the loop. <ins class="revision">The route is conceptual, not seven effects proven by our satellite data. Wildfire is an interacting disturbance, not a required step after thaw.</ins></p>
+<div class="key"><span><em style="background:#ff8a70"></em>People and impacts</span><span><em style="background:#7fcbe3"></em>Climate</span><span><em style="background:#c2b59b"></em>Ground</span></div>
+</div>
+</header>
+
+<section class="band review-ledger" aria-label="Defensibility edits and legend">
+<div class="wrap">
+<h2>What changed in this review</h2>
+<p><ins class="revision">Red text marks revised claims, safeguards, assumptions and proposed outputs. Unmarked material is retained from the original plan. No analytic thread or visualization has been removed.</ins></p>
+<ul>
+<li><ins class="revision">Planned findings are now hypotheses until validated with actual pixels, dates and field comparisons.</ins></li>
+<li><ins class="revision">InSAR ground motion is distinguished from inferred thaw, ground-ice loss and climate attribution.</ins></li>
+<li><ins class="revision">A measurement-quality index is kept separate from an interpretation-support index.</ins></li>
+<li><ins class="revision">Infrastructure risk bands become transparent monitoring-priority bands, pending engineering validation.</ins></li>
+<li><ins class="revision">The northern bounding box is not the whole corridor; southern forest and Brooks Range locations are separate study windows.</ins></li>
+<li><ins class="revision">November 2026 NISAR maturity, ionospheric and phase-unwrapping issues are explicitly checked.</ins></li>
+</ul>
+<p class="note">Proposed app evidence labels: <span class="flag obs">OBSERVED</span> direct satellite quantity; <span class="flag inf">INFERRED</span> model-dependent interpretation; <span class="flag lit">PUBLISHED</span> contextual research. These labels are not claims of independent validation.</p>
+</div>
+</section>
+
+<section class="band">
+<div class="wrap grid2">
+<div>
+<h2>Study area: one corridor, three sites</h2>
+<p><ins class="revision">The Dalton Highway begins north of Fairbanks near Livengood and runs north to Deadhorse; the Trans-Alaska Pipeline broadly parallels much of the route but not every road segment. The larger corridor traverses forest, the Brooks Range and North Slope tundra. Our northern study box is only one portion of that corridor.</ins></p>
+<p><ins class="revision">Initial northern study window: approximately 68.5°N–70.5°N, 152°W–147°W, subject to confirmed overlapping product footprints. Do not label this the full Dalton corridor. Use separate southern windows for the Brooks Range debris lobes and Fairbanks-area forest comparison, with each map showing its true extent and dates.</ins></p>
+</div>
+<div class="card scroll">
+<table class="stack">
+<thead><tr><th>Code</th><th>Site</th><th>Role in the story</th></tr></thead>
+<tbody>
+<tr><td>C</td><td data-l="Site">Corridor (whole route)</td><td data-l="Role">Maps, masks, coverage</td></tr>
+<tr><td>S1</td><td data-l="Site">Control tundra</td><td data-l="Role"><ins class="revision">A comparison baseline, not assumed stable</ins></td></tr>
+<tr><td>S2</td><td data-l="Site">Burn scar: Anaktuvuk River fire (2007)</td><td data-l="Role"><ins class="revision">Published fire-related subsidence and later stabilization; our observations are a separate test</ins></td></tr>
+<tr><td>S3</td><td data-l="Site">Oilfield and highway: Prudhoe Bay, Dalton Highway</td><td data-l="Role"><ins class="revision">Where deformation observations overlap with mapped infrastructure; screening, not asset-safety certification</ins></td></tr>
+</tbody></table>
+<p class="note" style="margin-top:8px">C and S1–S3 are our own shorthand for this plan, not codes from any dataset. Use the plain names in the app.</p>
+</div>
+</div>
+</section>
+
+<section class="band sec">
+<div class="wrap">
+<h2>InSAR and NISAR: what each one is</h2>
+<div class="grid2">
+<div>
+<p><b>InSAR is a technique.</b> <ins class="revision">It compares radar phase from repeat acquisitions with similar viewing geometry. Motion along the radar line of sight contributes to phase change, but the interferogram also contains non-deformation terms:</ins></p>
+<div class="eq"><math display="block"><mi>Δ</mi><msub><mi>φ</mi><mtext>def</mtext></msub><mo>=</mo><mfrac><mrow><mn>4</mn><mi>π</mi></mrow><mi>λ</mi></mfrac><mspace width="0.2em"/><mi>Δ</mi><mi>r</mi></math><small><ins class="revision">Magnitude relation after non-deformation corrections; the sign depends on the LOS and phase conventions. The 4π factor reflects the two-way path.</ins></small></div>
+<p>NISAR's L-band wavelength is about 24 cm, so one complete interferometric phase cycle represents about 12 cm of <ins class="revision">line-of-sight range change (not automatically vertical sinking):</ins></p>
+<div class="eq"><math display="block"><mi>Δ</mi><msub><mi>r</mi><mtext>fringe</mtext></msub><mo>=</mo><mfrac><mi>λ</mi><mn>2</mn></mfrac><mo>≈</mo><mn>12</mn><mspace width="0.2em"/><mtext>cm</mtext></math></div>
+<p><ins class="revision">The measured phase may contain DEM/topography residuals, tropospheric and ionospheric delays, orbital artifacts, surface changes and unwrapping errors. GUNW includes ionospheric phase estimates and geocoded lookup tables for some external corrections; these are not removed by default. Inspect metadata, apply the appropriate corrections with the documented signs and units, and verify residuals. For approximately vertical motion with negligible horizontal movement, LOS displacement can be converted using the local incidence angle:</ins></p>
+<div class="eq"><math display="block"><msub><mi>d</mi><mtext>vert</mtext></msub><mo>≈</mo><mfrac><msub><mi>d</mi><mtext>LOS</mtext></msub><mrow><mi>cos</mi><mi>θ</mi></mrow></mfrac></math><small><ins class="revision">Only under negligible horizontal motion and appropriate incidence-angle/sign conventions; do not use for downslope movement without an additional motion model.</ins></small></div>
+</div>
+<div>
+<p><b>NISAR is a satellite</b> with two kinds of product we use:</p>
+<ul>
+<li><span class="tag tn">NISAR · InSAR</span> GUNW: geocoded unwrapped interferograms, nominal 12-day nearest-neighbor pairs, 80 m posting for unwrapped phase, with coherence. <ins class="revision">After corrections and referencing, this estimates relative line-of-sight displacement; it does not directly classify thaw.</ins></li>
+<li><span class="tag tn">NISAR · backscatter</span> GCOV: calibrated, geocoded radar backscatter in available polarizations (not InSAR). <ins class="revision">Changes may reflect wetness, vegetation, roughness, seasonal thaw/freeze or acquisition differences; do not label backscatter alone as thaw.</ins></li>
+</ul>
+<p><b>Other satellites also give InSAR:</b> <span class="tag to">Sentinel-1 · InSAR</span> (C-band, 2016 onwards as OPERA DISP-S1) and <span class="tag to">ALOS · InSAR</span> (L-band, 2006–2010).</p>
+<h3>Rules that keep InSAR honest</h3>
+<ul>
+<li><b>Coherence</b> (0–1) <ins class="revision">is one interferometric quality indicator, not an overall probability of truth. Apply a stated threshold, inspect connected-component/unwrapping masks and test whether L-band coherence is higher in the chosen vegetated scene.</ins></li>
+<li><b>Snow<ins class="revision">, freeze–thaw and moisture changes can compromise pairs; prioritize verified snow-free dates (often summer, but confirm per acquisition), and retain observation-date metadata.</ins></b></li>
+<li><b>It is relative.</b> Every value is measured against a reference point and date. <ins class="revision">Do not assume a gravel pad is stable: assess reference stability and disclose residual regional offsets and reference uncertainty.</ins></li>
+<li><b><ins class="revision">Combining pairs into a time series can accumulate unwrapping, atmosphere, reference and surface-scattering biases. Report uncertainty and compare with independent Sentinel-1, ICESat-2 or field observations where spatial/temporal overlap permits.</ins></b></li>
+</ul>
+<div class="revision-block"><ins class="revision"><b>2026 Arctic-specific check:</b> NISAR release notes flag residual ionospheric effects, challenging phase unwrapping and a GUNW squint-compensation phase artifact. Inspect each selected product and its release/CRID before treating a localized anomaly as motion; compare corrected and uncorrected maps.</ins></div>
+
+</div>
+</div>
+</div>
+</section>
+
+<section class="band sec">
+<div class="wrap">
+<h2>The radar record: decades of data, with NISAR at the end</h2>
+<p><ins class="revision">NISAR science-phase acquisitions began in late 2025. Provisional products cover earlier 2026 observations; validated L-band products released 6 November 2026 cover acquisitions from 21 October 2026 onward. Product maturity and acquisition date must be tracked separately. Historical missions provide context, not a single continuous 30-year ground-motion series. Compare rates and seasonal amplitudes only after aligning footprints, reference definitions, sign conventions, processing choices and uncertainty.</ins></p>
+<div id="tl"></div>
+<div class="tl-axis"><div></div><div><span>1990</span><span>2000</span><span>2010</span><span>2020</span><span>2027</span></div></div>
+<p class="note" style="margin-top:10px">ALOS-2 data access varies by archive and agreement. <ins class="revision">The bars show mission eras, not guaranteed coverage of the selected pixels. The availability of any processed time series and overlap at each site must be checked before promising long-term fitted rates. Sentinel-1 launched in 2014; OPERA DISP-S1 coverage is a separate question.</ins></p>
+</div>
+</section>
+
+<section class="band sec">
+<div class="wrap">
+<h2>Datasets: what we use, where, and how</h2>
+<p>Site codes match the study-area table above. Access paths are the usual public portals; resolutions are typical values. <ins class="revision">Dataset listing is a sourcing plan, not confirmation that every product, site, time series or facility location is publicly available and usable today. Preserve each layer’s dates, processing version, spatial footprint and native resolution in the interface.</ins></p>
+<div id="ds"></div>
+</div>
+</section>
+
+<section class="band sec">
+<div class="wrap grid2">
+<div>
+<h2>Filters: ruling out false signals</h2>
+<p><ins class="revision">A pixel getting brighter or moving downward is not proof of permafrost thaw. Masks and contextual overlays reduce ambiguity; they do not conclusively rule out every alternative mechanism. Apply measurement-quality filters first, then combine contextual evidence into a separate thaw-interpretation score.</ins></p>
+<p><ins class="revision">If corrected NISAR backscatter and InSAR exhibit a consistent spatiotemporal change, it strengthens a thaw hypothesis. However, the measurements are not independent ground truth: both can respond to precipitation, vegetation or changing scatterers.</ins></p>
+</div>
+<div class="scroll">
+<table class="stack">
+<thead><tr><th>False signal</th><th>Rule it out with</th></tr></thead>
+<tbody>
+<tr><td>Not permafrost ground</td><td data-l="Use">ESA CCI Permafrost; Jorgenson et al. Alaska map</td></tr>
+<tr><td>Snow melting</td><td data-l="Use">MODIS daily snow cover</td></tr>
+<tr><td>Recent rain</td><td data-l="Use">ERA5-Land precipitation</td></tr>
+<tr><td>Normal seasonal thaw</td><td data-l="Use"><ins class="revision">Match thaw stage (ADDT) and comparable dates across years; separate seasonal amplitude from residual year-end change</ins></td></tr>
+<tr><td>Lakes and ponds</td><td data-l="Use">OPERA DSWx; JRC Global Surface Water</td></tr>
+<tr><td>Plants greening</td><td data-l="Use">Sentinel-2 / HLS NDVI; NISAR HV channel</td></tr>
+<tr><td><ins class="revision">Fire-driven landscape change</ins></td><td data-l="Use"><ins class="revision">Fire perimeters + pre/post-fire optical data; distinguish a suspected mechanism from measured movement</ins></td></tr>
+<tr><td><ins class="revision">Air temperatures poorly represent local soil</ins></td><td data-l="Use"><ins class="revision">ERA5 thaw degree-days as a proxy; compare with field ground temperatures when available</ins></td></tr>
+</tbody></table>
+</div>
+</div>
+</section>
+
+<section class="band sec">
+<div class="wrap">
+<h2><ins class="revision">Two scores, not a probability of thaw</ins></h2>
+<div class="grid2"><div>
+<p><ins class="revision">Separate (1) whether the satellite displacement is trustworthy from (2) whether permafrost thaw is a plausible explanation. Neither 0–1 score is a calibrated probability. A high-quality movement observation can have low thaw-interpretation support, and vice versa.</ins></p>
+<h3>1. Measurement validity: hard exclusions</h3>
+<p><ins class="revision">Grey out invalid pixels, labeling why: water / absent valid sample mask, snow or freeze–thaw contamination on pair dates, missing or disconnected unwrapped phase, severe layover/geometry, and insufficient observations. A low-coherence pixel can be excluded under a clearly stated cutoff. Outside-permafrost ground is not an invalid radar measurement; it is excluded only from the permafrost-specific interpretation view.</ins></p>
+<h3>2. Quality factors (Q) and interpretation factors (E)</h3>
+<p><ins class="revision">For each score, normalize and combine applicable factors with a weighted geometric mean, publishing the factors and weights:</ins></p>
+<div class="eq"><math display="block"><mi>S</mi><mo>=</mo><munder><mo>∏</mo><mi>i</mi></munder><msubsup><mi>f</mi><mi>i</mi><msub><mi>w</mi><mi>i</mi></msub></msubsup><mo>,</mo><mspace width="1em"/><munder><mo>∑</mo><mi>i</mi></munder><msub><mi>w</mi><mi>i</mi></msub><mo>=</mo><mn>1</mn></math><small><ins class="revision">Compute separately as Q and E. If any positive-weight factor is exactly zero, S is zero. An unavailable factor is 'not assessed' (with normalized weights on observed factors), not automatically zero; disclose missing evidence.</ins></small></div>
+<p><ins class="revision"><b>Team-defined bands:</b> high ≥ 0.75, medium 0.50–&lt;0.75, low &lt;0.50. These are screening categories, not probabilities or validated performance thresholds. Test sensitivity to factor weights and thresholds; report uncertainty separately.</ins></p>
+<div class="revision-block"><ins class="revision"><b>Calibration check:</b> With a few known positive and negative examples, test how the indexes rank sites. Avoid saying “82% confidence” or “82% probability of thaw”; instead say “Q=0.82 (team-defined quality index).”</ins></div>
+</div><div>
+<div class="scroll"><table class="stack"><thead><tr><th>Score / factor</th><th>Raw input</th><th>Conversion or limitation</th></tr></thead><tbody>
+<tr><td>Q: coherence</td><td data-l="Dataset">NISAR GUNW / Sentinel-1</td><td data-l="Ours"><ins class="revision">Scaled using team-declared, sensitivity-tested quality cutoffs; connected components and phase residuals checked separately</ins></td></tr>
+<tr><td><ins class="revision">Q: phase / correction quality</ins></td><td data-l="Dataset">GUNW ionosphere, unwrapping, valid masks and CRID</td><td data-l="Ours"><ins class="revision">Detect artifacts and incomplete corrections; do not award high quality from coherence alone</ins></td></tr>
+<tr><td><ins class="revision">Q: temporal support</ins></td><td data-l="Dataset">Acquisition count, dates and season</td><td data-l="Ours"><ins class="revision">Flag sparse pairs, known data gaps and an unstable reference; show uncertainty</ins></td></tr>
+<tr><td>E: permafrost context</td><td data-l="Dataset">ESA CCI / Jorgenson map</td><td data-l="Ours"><ins class="revision">A coarse spatial prior, not proof of ice at the exact radar pixel</ins></td></tr>
+<tr><td><ins class="revision">E: meteorological plausibility</ins></td><td data-l="Dataset">ERA5-Land ADDT and recent rain</td><td data-l="Ours"><ins class="revision">Warmth supports thaw timing; rain and water confound backscatter; choices for time windows and scales disclosed</ins></td></tr>
+<tr><td><ins class="revision">E: alternative mechanisms</ins></td><td data-l="Dataset">Water, vegetation, fire, slope, developed land</td><td data-l="Ours"><ins class="revision">Downweight ambiguous interpretations; allow “unknown cause” rather than forcing thaw</ins></td></tr>
+<tr><td><ins class="revision">E: cross-checks</ins></td><td data-l="Dataset">GCOV + InSAR + field / ICESat-2</td><td data-l="Ours"><ins class="revision">Corroboration supports interpretation; shared confounders remain; external field evidence ranked separately</ins></td></tr>
+<tr><td><ins class="revision">Model diagnostic only</ins></td><td data-l="Dataset">Fit to √ADDT, residuals, R²</td><td data-l="Ours"><ins class="revision">Show R² and error band, but do not define observation quality solely by agreement with our favored thaw model</ins></td></tr>
+</tbody></table></div>
+<p class="note"><ins class="revision">Q answers “how usable is the measurement?” E answers “how much does context support a thaw explanation?” A derived risk-priority band is a third output, not a synonym for either score.</ins></p>
+<h3>How the app shows it</h3>
+<ul>
+<li><ins class="revision"><b>Map hue:</b> LOS or qualified vertical displacement rate; <b>opacity:</b> Q. Use a switchable E overlay instead of hiding cause ambiguity.</ins></li>
+<li><ins class="revision"><b>Two badges</b> on every graph or result: “Measurement Q: high” and “Thaw interpretation E: medium”; show unavailable separately.</ins></li>
+<li><b>“Why?” panel:</b> click a pixel to inspect each factor, including corrected/uncorrected phase and alternative explanations.</li>
+<li><ins class="revision"><b>Quality and evidence toggles</b> recompute summaries; do not quietly change denominators.</ins></li>
+<li><b>Error bands</b> on time series from fit and measurement uncertainty, with separate model uncertainty.</li>
+<li><b>Weight sliders</b> in Explore mode, with default values marked as team-selected.</li>
+<li>For drawn regions, display shares of included / excluded pixels and medians, not just an average score.</li>
+</ul>
+</div></div></div></section>
+
+<section class="band sec">
+<div class="wrap">
+<h2>Metrics: four numbers carry the analysis</h2>
+<div class="grid2">
+<div>
+<h3>Long-term rate and thaw sensitivity</h3>
+<p><ins class="revision">Where enough consistent dates exist, fit a corrected, referenced displacement time series using a trend and a seasonal thermal term; a single summer of NISAR alone cannot establish a long-term rate:</ins></p>
+<div class="eq"><math display="block"><mi>d</mi><mo>(</mo><mi>t</mi><mo>)</mo><mo>=</mo><mi>v</mi><mo>(</mo><mi>t</mi><mo>−</mo><msub><mi>t</mi><mn>0</mn></msub><mo>)</mo><mo>+</mo><mi>A</mi><msqrt><mrow><msub><mtext>ADDT</mtext><mi>y</mi></msub><mo>(</mo><mi>t</mi><mo>)</mo></mrow></msqrt><mo>+</mo><mi>c</mi><mo>+</mo><mi>ε</mi><mo>(</mo><mi>t</mi><mo>)</mo></math></div>
+<ul>
+<li><math><mi>v</mi></math>: <ins class="revision">estimated long-term residual ground-motion rate (cm/yr); persistent subsidence may be consistent with ground-ice loss but is not automatic proof of its cause</ins></li>
+<li><math><mi>A</mi></math>: <ins class="revision">empirical seasonal thermal sensitivity of displacement; not a direct estimate of thaw depth without physical and site calibration</ins></li>
+<li><math><mi>c</mi></math>: a constant reference offset; <ins class="revision">ε(t) is a residual whose time correlation and uncertainty must be assessed</ins></li>
+</ul>
+<div class="eq"><math display="block"><mtext>ADDT</mtext><mo>(</mo><mi>t</mi><mo>)</mo><mo>=</mo><munder><mo>∑</mo><mtext>days</mtext></munder><mi>max</mi><mo>(</mo><msub><mi>T</mi><mtext>air</mtext></msub><mo>,</mo><mn>0</mn><mo>)</mo></math><small>Accumulated degree-days of thaw (ADDT): daily positive 2 m air temperatures summed since seasonal onset; 5 days at +10 °C = 50 °C·days. <ins class="revision">The Stefan square-root relationship motivates a candidate model for thaw depth; displacement additionally depends on ice/water content and soil properties. ERA5 is a coarse air-temperature proxy, not in situ soil temperature.</ins></small></div>
+<p class="note"><b>Research backing:</b> Stefan-type thaw-depth laws motivate <math><mi>h</mi><mo>≈</mo><mi>N</mi><msqrt><mtext>ADDT</mtext></msqrt></math>. <ins class="revision">ReSALT-style active-layer inversion additionally requires soil/ground-ice assumptions and validation: the fitted displacement coefficient A is not simply the physical thaw-depth coefficient N. The 2024 Dalton-area study found a relatively weak ADDT–measured ALT relationship (R²≈0.42); do not claim a universal heat-to-subsidence law or an unvalidated depth accuracy.</ins></p>
+</div>
+<div>
+<h3>Uneven-sinking risk</h3>
+<p><ins class="revision">Differential settlement can stress structures, but absolute settlement, slope, design and local ground conditions also matter. For an initial screening map, estimate a spatial settlement gradient only where resolution and uncertainty support it:</ins></p>
+<div class="eq"><math display="block"><mi>β</mi><mo>=</mo><mfrac><mrow><mi>Δ</mi><mi>s</mi></mrow><mi>L</mi></mfrac></math><small><ins class="revision">Δs is the measured displacement difference and L is their spacing, along a verified road/pipeline geometry. Native 80 m GUNW posting cannot resolve every road-width gradient. Propagate uncertainty in Δs; use consistently sized along-corridor windows and call categories relative monitoring priority, not engineering “critical.”</ins></small></div>
+<h3>Infrastructure exposure</h3>
+<p><ins class="revision">Overlay measurement-quality-screened, uncertainty-qualified deformation zones with independently checked road/pipeline traces and building footprints. Count km and buildings near candidate anomalies, clearly distinguishing valid observed overlap from unmapped or low-quality areas. Report per-year exposure only when comparable time-series coverage exists; these are monitoring priorities, not verified asset damage or safety ratings.</ins></p>
+<h3>Two different yearly measurements</h3>
+<ul>
+<li><b>Seasonal amplitude</b> (within-season movement). <ins class="revision">An increase is consistent with deeper thaw in some settings, but can also reflect changing soil moisture, ground ice or acquisition timing.</ins></li>
+<li><b>Net drift</b> (residual change between comparable seasonal endpoints). <ins class="revision">Persistent subsidence may indicate degradation but requires excluding other processes and reference drift. Even without inferred ice loss, repeated differential settlement can matter for infrastructure.</ins></li>
+</ul>
+</div>
+</div>
+</div>
+</section>
+
+<section class="band sec">
+<div class="wrap">
+<h2>Analysis threads: from data to insight</h2>
+<p>Each row reads left to right. The insight column is what each analysis tests for. These are hypotheses until the numbers are run. <ins class="revision">The target is to implement every thread; results may be “insufficient coverage,” “no detectable change” or “cause unresolved.” Label observations, inference and published context separately.</ins></p>
+<div class="thread"><div class="thead">1. Data</div><div class="thead hide">2. Filters</div><div class="thead hide">3. Metric</div><div class="thead hide">4. Visual</div><div class="thead hide">5. Insight we test</div></div>
+<div id="th"></div>
+<div class="key" style="color:var(--mute)"><span><span class="tag tn">NISAR · InSAR</span>NISAR ground motion</span><span><span class="tag tn">NISAR · backscatter</span>NISAR surface brightness</span><span><span class="tag to">Other radar</span>Sentinel-1 or ALOS InSAR</span></div>
+</div>
+</section>
+
+<section class="band sec">
+<div class="wrap">
+<h2>Visualisations, in story order</h2>
+<div class="scroll">
+<table class="stack">
+<thead><tr><th>Visual</th><th>Question</th><th>Data</th><th>Design</th><th>Takeaway</th></tr></thead>
+<tbody id="vz"></tbody>
+</table>
+</div>
+</div>
+</section>
+
+<section class="band sec">
+<div class="wrap">
+<h2>Two horizons: act locally now, monitor globally</h2>
+<div class="horiz">
+<div class="hz">
+<h3>Short term: infrastructure, safety, health</h3>
+<p><ins class="revision">NISAR can contribute observations of ground movement near infrastructure where coherent pixels and valid geometry exist. The β gradient and exposure tally flag locations worth inspection; they are not calibrated damage predictions, and a coarse pixel cannot establish movement directly under a narrow road or pipeline. Ground works, excavation, fill compaction or fluid extraction may also contribute, so describe candidate movement alongside infrastructure and its alternative causes.</ins></p>
+<ul>
+<li>Nearly 70% of current infrastructure in the permafrost domain is in areas with high potential for near-surface thaw by 2050 (Hjort et al., 2022).</li>
+<li>Permafrost thaw damage to Alaska buildings and roads is estimated at $37B (SSP2-4.5) to $51B (SSP5-8.5) by mid-century.</li>
+<li>43 frozen debris lobes have been identified in the Dalton corridor through the southern Brooks Range, 23 of them less than a mile uphill of the highway.</li>
+<li>In Utqiaġvik, thaw subsidence undermines traditional ice cellars. The Alaska Native Tribal Health Consortium links this to foodborne illness risk and food security. Soil conditions and development also play a role.</li>
+</ul>
+</div>
+<div class="hz long">
+<h3>Long term: the carbon feedback</h3>
+<p>Say <b>"self-reinforcing feedback, with possible localized abrupt thaw"</b>, not "runaway". <ins class="revision">A subsidence map cannot identify an emissions rate or prove a climatic tipping point. Use the literature to distinguish gradual permafrost-carbon feedback from specific proposed abrupt-thaw tipping processes.</ins></p>
+<ul>
+<li>Permafrost holds roughly twice as much carbon as the atmosphere.</li>
+<li>There is high confidence thaw will release carbon, and some regions are already net sources. The losses are irreversible on century timescales.</li>
+<li>IPCC AR6's estimate of 3–41 GtC per °C of warming excludes abrupt thaw and fire-permafrost interactions, so it likely underestimates emissions.</li>
+<li><b>Our link:</b> <ins class="revision">InSAR and optical/DEM changes may locate candidate abrupt-subsidence and fire-affected areas relevant to permafrost-carbon discussions; verifying abrupt thaw requires morphology/temporal evidence. NISAR does not directly measure soil carbon or emissions.</ins></li>
+</ul>
+</div>
+</div>
+</div>
+</section>
+
+<section class="band sec">
+<div class="wrap">
+<h2>Beyond infrastructure: health and environmental risks</h2>
+<p>Uneven sinking under roads is only one risk. These are backed by published research, and most connect to something NISAR can watch. <ins class="revision">Health and contamination impacts are published contextual examples, not predicted directly from our radar. Map proximity and possible physical exposure only where facility locations and deformation are reliable.</ins></p>
+<div class="scroll">
+<table class="stack">
+<thead><tr><th>Risk</th><th>Evidence</th><th>What NISAR can show</th></tr></thead>
+<tbody>
+<tr><td>Water and sanitation</td><td data-l="Evidence">Nearly 170,000 people in 192 Alaskan communities live in permafrost zones. Thaw can pollute drinking water and damage sewage systems, raising waterborne disease risk. In Quinhagak thaw destabilised the sewage lagoon.</td><td data-l="NISAR"><ins class="revision">Candidate nearby deformation; cannot infer contamination or leakage without site observations</ins></td></tr>
+<tr><td>Hospitals and medical access</td><td data-l="Evidence">Thaw carved a cave beneath Nome's Norton Sound Regional Hospital. Runway and road damage has cut hospitals off from air-delivered supplies.</td><td data-l="NISAR"><ins class="revision">Candidate anomalies near mapped clinics/runways, with resolution and geometry caveats</ins></td></tr>
+<tr><td>Industrial contamination</td><td data-l="Evidence">An estimated 13,000–20,000 contaminated sites exist in the permafrost region; 26% will be affected by thaw before 2100 (Langer et al., 2023).</td><td data-l="NISAR"><ins class="revision">Co-location with observed deformation only; contamination release cannot be inferred</ins></td></tr>
+<tr><td>Natural mercury</td><td data-l="Evidence">Northern permafrost is the largest mercury reservoir on Earth, about twice all other soils, the ocean and the atmosphere combined. How much would reach ecosystems is still uncertain.</td><td data-l="NISAR">Context only; where thaw is fastest</td></tr>
+<tr><td>Food security</td><td data-l="Evidence">Ice cellars failing; land animals, over a fifth of rural Alaskans' wild food, shift migration around thaw damage and drained lakes.</td><td data-l="NISAR"><ins class="revision">Potential water-body change from GCOV with independent DSWx/optical confirmation</ins></td></tr>
+<tr><td>Pathogens (global example)</td><td data-l="Evidence"><ins class="revision">Yamal, 2016: a published study reported 2,650 infected reindeer (2,350 deaths). Exceptional summer warmth, thaw conditions and cessation of vaccination all matter; thaw as the sole trigger is not established. This is global context, not a hazard our Alaska map predicts.</ins></td><td data-l="NISAR">None; use only as a "what can happen" example</td></tr>
+</tbody></table>
+</div>
+</div>
+</section>
+
+<section class="band sec">
+<div class="wrap grid2">
+<div>
+<h2>What not to claim</h2>
+<ul>
+<li><ins class="revision">Do not say “NISAR directly measures thaw” or “proves climate change.” Say it estimates ground motion; thermal, landcover and field evidence may support a permafrost interpretation. Historical climate attribution relies on broader published science.</ins></li>
+<li><ins class="revision">One snow-free NISAR season may sample only part of the seasonal cycle, depending on valid acquisitions; do not promise a trend from NISAR 2026 alone. Historical rates can be estimated from suitable multi-year Sentinel-1 or ALOS series when available and cross-calibrated.</ins></li>
+<li><ins class="revision">Published research suggests some undisturbed tundra can show limited residual change, and the Anaktuvuk fire area has documented post-fire subsidence. Do not predetermine which of our three sites moves most: test them and show null results if that is what the data support.</ins></li>
+<li><ins class="revision">Radar backscatter can brighten or darken with thaw, rain, vegetation, roughness and viewing geometry; a single direction of brightness change is not a universal thaw signature. Compare compatible polarizations/modes and corroborate with other sensors.</ins></li>
+<li>Do not invent cost figures. Quote published estimates as context. <ins class="revision">Likewise never convert an unvalidated priority score into failure probability, repair-cost prediction or risk to a named community.</ins></li>
+</ul>
+</div>
+<div>
+<h2>App structure</h2>
+<ul>
+<li><b>Story mode is the landing page</b> for policymakers and the public: one visual per chapter, with plain captions.</li>
+<li><b>Explore mode</b>: draw an area to get the rate map, three-site trend, risk ribbon and <ins class="revision">separate Q/E evidence layers, with selectable comparison area; show insufficient coverage rather than extrapolating across unobserved regions.</ins></li>
+<li>Use the globe only as an animated intro, then a 2D map (MapLibre or Leaflet) with a polygon tool.</li>
+<li>Pre-compute v, A, yearly brightness and β as map tiles. <ins class="revision">Ingest GUNW/GCOV with geospatial preprocessing, preserve masks/version/units and serve provenance with each tile; don’t portray unprocessed RRSD or QA reports as deformation maps.</ins></li>
+<li>Rename "NISAR spectrum" to "Radar layer": <ins class="revision">backscatter proxy, cross-polarized scattering (where available), and inferred ground motion. Avoid calling HV a direct vegetation-structure measurement without validation.</ins></li>
+<li><ins class="revision">Default to quality-screened snow-free ground-motion analysis; show other seasons separately only if the data are interpretable, with a warning about freeze–thaw and temporal gaps.</ins></li>
+</ul>
+</div>
+</div>
+</section>
+
+<section class="band sec">
+<div class="wrap">
+<h2>Sources</h2>
+<ul class="src">
+<li><a href="https://www.spaceappschallenge.org/2026/challenges/dancing-with-the-sars/">NASA Space Apps 2026: Dancing with the SARs</a></li>
+<li><a href="https://forum.earthdata.nasa.gov/viewtopic.php?p=26356">ASF: NISAR L-band data now publicly available (July 2026)</a></li>
+<li><a href="https://hyp3-docs.asf.alaska.edu/nisar-docs/availability-overview/">ASF NISAR data availability overview</a></li>
+<li><a href="https://nisar-docs.asf.alaska.edu/gunw/">ASF NISAR GUNW product guide</a> · <a href="https://hyp3-docs.asf.alaska.edu/nisar-docs/gcov">GCOV product guide</a></li>
+<li><ins class="revision"><a href="https://hyp3-docs.asf.alaska.edu/nisar-docs/release-notes/">ASF NISAR validated release notes (Nov 2026)</a> · <a href="https://hyp3-docs.asf.alaska.edu/nisar-docs/nisar-known-issues/">Known issues (high-latitude ionosphere, unwrapping, GUNW artifact)</a></ins></li>
+<li><a href="https://asf.alaska.edu/?p=22999">ASF NISAR mission overview (24 cm L-band, 12-day repeat)</a></li>
+<li><a href="https://fringe2026.esa.int/iframe-agenda/files/ID_166.pdf">Meyer, FRINGE 2026: NISAR permafrost validation (requirement #671)</a></li>
+<li><a href="https://www.earthdata.nasa.gov/data/projects/nsite/solutions/opera-north-america-disp-product-suite">NASA OPERA DISP product suite</a></li>
+<li><a href="https://tc.copernicus.org/articles/18/3723/2024/">Sadeghi Chorsi et al. 2024: Sentinel-1 permafrost monitoring near the Dalton Highway</a></li>
+<li><a href="https://pubs.usgs.gov/publication/70114502">Liu et al. 2014: InSAR detects subsidence after the Anaktuvuk River fire</a></li>
+<li><a href="https://par.nsf.gov/servlets/purl/10213319">Chen et al.: ALOS InSAR active-layer dynamics, North Slope</a></li>
+<li><a href="https://par.nsf.gov/biblio/10570465-thawing-permafrost-subsiding-northern-hemispherereview-perspectives">Thawing permafrost is subsiding in the Northern Hemisphere (review)</a></li>
+<li><a href="https://www.nature.com/articles/s43017-021-00247-8">Hjort et al. 2022: Impacts of permafrost degradation on infrastructure</a></li>
+<li><a href="https://par.nsf.gov/biblio/10414787">Alaska building and road thaw damage, $37B–$51B</a></li>
+<li><a href="https://dggs.alaska.gov/pubs/id/30012">Alaska DGGS: frozen debris lobe FDL-A</a></li>
+<li><a href="https://journalhosting.ucalgary.ca/index.php/arctic/article/download/79682/57737/257376">Nyland et al. 2024: Permafrost food storage in Utqiaġvik</a></li>
+<li><a href="https://pik-potsdam.de/members/johanro/ArmstrongMcKayetal2022_ClimateTippingPointsReassessment_AcceptedversionwithFigures.pdf">Armstrong McKay et al. 2022: Climate tipping points reassessment</a></li>
+<li><a href="https://www.woodwellclimate.org/review-of-permafrost-science-in-ipccs-ar6-wg1/">Woodwell: Review of permafrost science in IPCC AR6 WG1</a></li>
+<li><a href="https://www.belfercenter.org/research-analysis/permafrost-thaw-alaska-overlooked-climate-health-crisis">Belfer Center: Permafrost thaw in Alaska, an overlooked climate-health crisis</a></li>
+<li><a href="https://doaj.org/article/db57254552484da9ad294b0ab5af6d5f">Langer et al. 2023: Thawing permafrost and legacy industrial contamination</a></li>
+<li><a href="https://nsidc.org/news/newsroom/scientists-find-massive-reserves-mercury-hidden-permafrost">Schuster et al. 2018: Permafrost stores a globally significant amount of mercury</a></li>
+<li><a href="https://openpolar.no/Record/ftpubmed:oai:pubmedcentral.nih.gov:8264129/Description">Reindeer anthrax in the Russian Arctic, 2016</a></li>
+<li><a href="https://research-groups.usask.ca/hydrology/documents/CRHM_papers/Xie_Gough_2013.pdf">Xie and Gough 2013: The Stefan equation for thaw depth</a></li>
+<li><a href="https://www.preprints.org/manuscript/202312.0500/v2">ReSALT and the √ADDT relation (preprint, not peer-reviewed)</a></li>
+</ul>
+<div class="revision-block"><ins class="revision"><b>Decision rule for the public-facing demo:</b> Each output is labelled as (a) observation, (b) inference requiring assumptions, or (c) published context. “No detectable movement,” “missing valid pairs,” and “cause unresolved” are scientifically useful outcomes—not failed features.</ins></div>
+</div>
+</section>
+
+<script>
+{
+const tl=[["ERS-1/2","C-band",1991,2011,"c-band"],["ALOS PALSAR","L-band",2006,2011,"l-band"],["Sentinel-1","C-band · DISP-S1 from 2016",2014,2027,"c-band"],["NISAR","L-band",2025.95,2027,"n-band"]];
+const p=y=>((y-1990)/37*100).toFixed(2);
+document.getElementById('tl').innerHTML=tl.map(r=>`<div class="tl-row"><b>${r[0]}</b><div class="tl-track"><div class="tl-bar ${r[4]}" style="left:${p(r[2])}%;width:${(p(r[3])-p(r[2])).toFixed(2)}%" title="${r[1]}">${r[3]-r[2]>4?r[1]:''}</div></div></div>`).join('');
+
+const N=s=>`<span class="tag tn">${s}</span>`,O=s=>`<span class="tag to">${s}</span>`,R=s=>`<ins class="revision">${s}</ins>`;
+const ds=[
+["Core radar: the measurements",[
+["NISAR GUNW",N("NISAR · InSAR"),"ASF Vertex / Earthdata",R("2025 science phase–now; 2026 earlier PROVISIONAL / ≥21 Oct VALIDATED"),"80 m, 12-day pairs","S1–S3",R("Quality-screened LOS displacement on available pairs; compare with Sentinel-1 and screened road buffers; no inference from L0 QA")],
+["NISAR GCOV",N("NISAR · backscatter"),"ASF Vertex / Earthdata","2025–now","10–80 m by mode","C",R("Comparable-mode backscatter changes; candidate wetness / surface changes with weather, vegetation and optical checks")],
+["OPERA DISP-S1",O("Sentinel-1 · InSAR"),"ASF Displacement Portal / DAAC","Jul 2016–now","30 m, 6–12 days","C, S1–S3",R("Historical multi-year displacement where time series are valid; test v/A fits, reference stability and fit uncertainty")],
+["ALOS PALSAR",O("ALOS · InSAR"),"ASF DAAC","2006–2011","~10–30 m","S2",R("Published historical fire baseline; new time series only if overlapping raw pairs are obtainable and processed")],
+["ABoVE UAVSAR (2017)",O("Airborne · InSAR"),"ORNL DAAC","2017","30 m","S1, S3","Published sinking, active-layer and soil-moisture maps for comparison"]]],
+["Filters: ruling out false signals",[
+["ESA CCI Permafrost","","CEDA archive","1997–now","1 km","C",R("Coarse permafrost contextual layers; not direct truth at 80 m pixel scale")],
+["Jorgenson et al. Alaska map","","UAF / published","Static","Regional","C","Permafrost and ground-ice zones; ice-rich ground should sink most"],
+["MODIS snow cover","","NSIDC","2000–now, daily","500 m","C",R("Screen acquisition dates and snow/mixed pixels; MODIS resolution may be coarser than radar")],
+["ERA5 / ERA5-Land","","Copernicus Climate Data Store","1940s–now, hourly","~9–31 km","C",R("ADDT and rain context at reanalysis scale; site soils may differ from coarse air-temperature proxies")],
+["OPERA DSWx / JRC Global Surface Water","","PO.DAAC / JRC",R("JRC historical archive / OPERA contemporary; verify dataset-specific dates"),"30 m","C",R("Water masks and independently verified surface-water change; do not conflate product periods")]]],
+["Causes and context",[
+["Alaska fire perimeters / MTBS","","AICC / MTBS","1940s–now / 1984–now","Polygons / 30 m","S2","Burned vs unburned comparison areas; burn severity vs sinking"],
+["NASA FIRMS","","FIRMS","2000–now","375 m–1 km","S2","Fire timing to line up with radar dates"],
+["OpenStreetMap","","Geofabrik extracts","Current","Vector","S3",R("Candidate infrastructure overlays; verify alignment/coverage and calculate β only at resolvable scales")],
+["Building footprints","","Microsoft; HABITAT map","Current","Vector","S3",R("Count footprints overlapping quality-screened candidate ground-motion areas, not damaged buildings")],
+["Alaska DGGS debris lobes","","DGGS publications","2012–now","Site data","S3",R("Separate southern Brooks Range AOI: slope motion is not vertical thaw subsidence")],
+["Alaska Contaminated Sites database","","Alaska DEC Contaminated Sites Program","Ongoing register","Point sites","S3, C",R("Show co-location with observed motion; do not infer pollutants are mobilized")],
+["Community facilities","","OpenStreetMap + community facility lists (to be sourced)","Current","Point sites","C",R("Facility-location overlays only where geocoded accurately; no direct health-risk predictions")],
+["ArcticDEM","","Polar Geospatial Center","2007–now strips","2 m","C, S2","Slope, hillshade; repeat strips show slumps and lobes moving"]]],
+["Visual layer",[
+["Sentinel-2 / HLS","","Copernicus / LP DAAC","2015–now","10–30 m","C","True-colour images for sliders; NDVI for the vegetation filter"],
+["Landsat","","USGS EarthExplorer","1984–now","30 m","C, S2","Long-term slider: lakes draining, slumps growing, burn scars fading"]]],
+["Validation",[
+["ICESat-2","","NSIDC","2018–now","Along-track points","S1, S3",R("Potential along-track contextual elevation evidence; align dates, surface types and uncertainties")],
+["CALM sites and GTN-P / UAF boreholes","","CALM, GTN-P","1990s–now","Point sites","S1",R("Ground truth when site, season and spatial footprint can be matched")],
+["NISAR validation field data","","NISAR validation database","2025–now","Field sites","S1, S3",R("Use only if accessible and spatially relevant; do not assume open coverage at all three sites")]]]];
+document.getElementById('ds').innerHTML=ds.map(g=>`<h3>${g[0]}</h3><div class="scroll"><table class="stack"><thead><tr><th>Dataset</th><th>Access</th><th>Period</th><th>Resolution</th><th>Where</th><th>How we use it</th></tr></thead><tbody>${g[1].map(r=>`<tr><td>${r[0]}${r[1]?'<br>'+r[1]:''}</td><td data-l="Access">${r[2]}</td><td data-l="Period">${r[3]}</td><td data-l="Resolution">${r[4]}</td><td data-l="Where" class="nw">${r[5]}</td><td data-l="How">${r[6]}</td></tr>`).join('')}</tbody></table></div>`).join('');
+
+const th=[
+["Ground motion over years","S1 · S2 · S3",O("Sentinel-1 · InSAR")+O("ALOS · InSAR")+N("NISAR · InSAR"),"Snow and water masks; same season each year",R("Qualified residual rate v (cm/yr), with temporal span and uncertainty"),"Rate map + three-site trend line",R("Test whether control, burn and developed sites show different seasonal amplitudes and residual trends; no predetermined winner")],
+["Infrastructure exposure","S3",N("NISAR · InSAR")+"GUNW 2026 + OSM + building footprints",R("Valid samples, snow/water, connected-components and coherence checks"),R("km of assets and building counts by monitoring-priority band, with valid-coverage denominator"),"Exposure tally by asset type",R("Reports assets near reliable observed deformation, temporal coverage and monitoring priority—not proven damage")],
+["Climate link","S1",O("Sentinel-1 · InSAR")+N("NISAR · InSAR")+"+ ERA5","Same season; ADDT &gt; 0","Sensitivity A; each summer's sinking vs √ADDT","Climate scatter, one dot per year",R("Tests thermal association with seasonal movement; precipitation, land cover and ground properties also matter")],
+["When does the ground thaw and soak?","C",N("NISAR · backscatter")+"GCOV HH/HV","Rain, snow, water masks; permafrost zone","Brightness change, same date across years","Swipe slider + wetness map",R("Highlights possible surface wetness / scattering changes; thaw state is inferred, not directly measured")],
+["Thaw trigger to sinking","S2 · S3",N("NISAR · backscatter")+N("NISAR · InSAR"),"Same masks on the same pixels",R("Lag or covariation between candidate surface and displacement signals, with ambiguity"),"Paired time series",R("Tests whether radar backscatter and deformation covary; they may share confounders, so timing alone is not causal proof")],
+[R("Infrastructure monitoring priority"),"S3",N("NISAR · InSAR")+"+ OSM highway, pipeline, buildings","Permafrost zone; coherence mask",R("β from resolvable, uncertainty-screened along-corridor windows"),R("Risk-priority ribbon + km screened counter"),R("X km of mapped assets overlap high monitoring-priority anomaly zones, conditional on valid resolution and uncertainties")],
+["Contaminated sites on moving ground","S3 · C",N("NISAR · InSAR")+"+ Alaska Contaminated Sites database",R("Q ≥ team-defined medium; show E separately"),"Sinking rate and β at each listed site","Flagged-site layer on the map",R("Maps listed sites near observed movement; actual contaminant release remains unknown")],
+["Water, sanitation and health access","C",N("NISAR · InSAR")+"+ facility locations",R("Q ≥ team-defined medium; show E separately"),"Sinking under lagoon berms, tanks, clinics; β along runways","Health-risk layer with facility cards",R("Identifies facilities near observed anomalies for follow-up; health impact is contextual, not remotely diagnosed")],
+["Abrupt thaw extent","C · S2",N("NISAR · InSAR")+N("NISAR · backscatter")+"+ ArcticDEM",R("Validity and quality masks + independent DEM/optical confirmation"),"Area of collapsing or fire-thawed ground, and its growth","Abrupt-thaw map with area counter",R("Maps candidate abrupt deformation with DEM/optical morphology; cannot infer site carbon emissions")],
+["Why NISAR matters","C (forest near Fairbanks)",N("NISAR · InSAR")+O("Sentinel-1 · InSAR"),R("Comparable seasonal dates, incidence geometry, terrain, pixel scales and masks"),"Coherence: L-band vs C-band","Side-by-side coherence map",R("Quantifies whether L-band retains more usable coherence at this forest test site; difference is scene-dependent")],
+["Can we trust it?","C","All of the above","Every mask combined",R("Q measurement quality and E interpretation support (separate heuristics)"),R("Q opacity + E layer + Why? panel + uncertainty / missing-data indicator"),R("Each derived value reports Q measurement quality, E thaw-evidence support, missing data and uncertainty")]];
+document.getElementById('th').innerHTML=th.map(r=>`<div class="tname">${r[0]}<span class="site">${r[1]}</span></div><div class="thread">${r.slice(2,6).map(x=>`<div class="c">${x}</div>`).join('')}<div class="c ins">${r[6]}</div></div>`).join('');
+
+const vz=[
+["1. Zoom-in intro","Where is this, and why does it matter?","Permafrost map, OSM","Globe to Alaska to corridor, highway and pipeline drawn in",R("This corridor crosses mapped permafrost terrain; site-level conditions vary")],
+["2. Swipe slider","What does radar see that cameras can't?","Sentinel-2 vs NISAR GCOV, same week","Drag a divider between the two images",R("Radar operates through cloud / darkness and responds to multiple surface properties, including moisture")],
+[R("3. Ground-motion map"),"Where is the ground sinking?",R("Multi-year v from validated time series; 2026 NISAR pair observations shown separately"),"Blue stable to red sinking, roads overlaid, masked pixels greyed",R("Shows observed LOS displacement and any clusters conditional on quality—not a predetermined map")],
+["4. Three-site trend","Is it getting worse, and where?",R("Published ALOS baseline, usable DISP-S1 series and separately labelled 2026 NISAR pairs"),"Three lines: control, burn, oilfield; NISAR 2026 highlighted",R("Compare three time series; show whether trends differ and where the data are inconclusive")],
+["5. Exposure tally","How much infrastructure is on moving ground?",R("Priority bands + checked OSM/assets + quality masks"),"Bars by asset type: highway km, pipeline km, buildings, airstrips",R("Exposure counts with uncertainty, quality threshold and unmapped fraction")],
+["6. Climate scatter","Is warming the driver?","Yearly sinking vs √ADDT","One dot per year, fitted line",R("Strength and uncertainty of seasonal warmth–movement association; not standalone climate attribution")],
+["7. Risk ribbon","What is actually in danger?",R("Uncertainty-qualified β over supported spatial windows"),R("Highway ribbon with km by monitoring-priority band and uncertainty"),R("Centimetres become a monitoring-priority screen, not an engineering safety verdict")],
+["8. Coherence comparison","Why NISAR?","NISAR vs Sentinel-1 coherence","Side-by-side maps over forest",R("Measure relative L/C-band coherence where comparability is adequate")],
+[R("9. Evidence and quality map"),"Can we trust it?",R("Independent Q and E heuristic layers"),R("Q opacity, E interpretation overlay, uncertainty and reasons for missing / excluded pixels"),R("Measured uncertainty and separate evidence support keep model claims auditable")],
+["10. Health and contamination layer","Who else is at risk?",R("Quality-screened movement + independently mapped facilities / sites"),"Map pins for lagoons, clinics, runways and contaminated sites, coloured by risk",R("Connect published health stakes with mapped facility exposure; no direct health diagnosis")],
+["11. Impact loop","So what?","Published research","Two horizons: short-term safety, long-term carbon",R("Separate actionable local monitoring from literature-based carbon implications")]];
+document.getElementById('vz').innerHTML=vz.map(r=>`<tr><td>${r[0]}</td><td data-l="Question">${r[1]}</td><td data-l="Data">${r[2]}</td><td data-l="Design">${r[3]}</td><td data-l="Takeaway">${r[4]}</td></tr>`).join('');
+}
+</script>
+</body>
+</html>

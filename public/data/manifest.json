@@ -1,0 +1,67 @@
+{
+  "dataset_mode": "demo",
+  "generated_at": "2026-11-14",
+  "processing_version": "demo-2026.11.1",
+  "grid": {
+    "crs": "EPSG:3338",
+    "cell_size_m": 100,
+    "mvp_bbox": [
+      -152.0,
+      68.5,
+      -147.0,
+      70.5
+    ]
+  },
+  "reference": {
+    "name": "Candidate control tundra reference (team review required)",
+    "latitude": 69.68,
+    "longitude": -148.7,
+    "date": "2016-07-01",
+    "stability": "Not independently validated"
+  },
+  "nisar_status": {
+    "maturity": "PROVISIONAL",
+    "thaw_season": "summer 2026",
+    "gap": [
+      "2026-07-27",
+      "2026-08-10"
+    ],
+    "posting_m": 80
+  },
+  "layers": [
+    {
+      "id": "nisar_motion",
+      "label": "NISAR relative LOS displacement",
+      "source": "Synthetic analogue of NISAR L2 GUNW",
+      "evidence": "OBSERVED",
+      "status": "DEMO / PROVISIONAL analogue"
+    },
+    {
+      "id": "sentinel_baseline",
+      "label": "Historical radar baseline",
+      "source": "Synthetic analogue of OPERA DISP-S1",
+      "evidence": "OBSERVED",
+      "status": "DEMO"
+    },
+    {
+      "id": "measurement_q",
+      "label": "Measurement quality Q",
+      "source": "Team-defined scoring config",
+      "evidence": "INFERRED",
+      "status": "DEMO"
+    },
+    {
+      "id": "interpretation_e",
+      "label": "Thaw interpretation E",
+      "source": "Team-defined scoring config",
+      "evidence": "INFERRED",
+      "status": "DEMO"
+    }
+  ],
+  "limitations": [
+    "All map and chart values are synthetic and must not be used for decisions.",
+    "The candidate control and stable reference areas require team and field review.",
+    "NISAR 2026 thaw-season products are provisional and contain a permanent 27 July–10 August data gap.",
+    "Ground motion is relative displacement, not a direct measurement of thaw or asset safety."
+  ]
+}

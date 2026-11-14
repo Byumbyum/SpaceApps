@@ -1,0 +1,193 @@
+[
+  {
+    "date": "2016-08-15",
+    "year": 2016,
+    "observed": -1.08,
+    "control": -0.55,
+    "lower": -1.7,
+    "upper": -0.7,
+    "source": "Sentinel-1",
+    "provisional": false
+  },
+  {
+    "date": "2017-08-15",
+    "year": 2017,
+    "observed": -1.39,
+    "control": -0.59,
+    "lower": -1.88,
+    "upper": -0.88,
+    "source": "Sentinel-1",
+    "provisional": false
+  },
+  {
+    "date": "2018-08-15",
+    "year": 2018,
+    "observed": -1.69,
+    "control": -0.63,
+    "lower": -2.06,
+    "upper": -1.06,
+    "source": "Sentinel-1",
+    "provisional": false
+  },
+  {
+    "date": "2019-08-15",
+    "year": 2019,
+    "observed": -1.87,
+    "control": -0.67,
+    "lower": -2.24,
+    "upper": -1.24,
+    "source": "Sentinel-1",
+    "provisional": false
+  },
+  {
+    "date": "2020-08-15",
+    "year": 2020,
+    "observed": -1.93,
+    "control": -0.71,
+    "lower": -2.42,
+    "upper": -1.42,
+    "source": "Sentinel-1",
+    "provisional": false
+  },
+  {
+    "date": "2021-08-15",
+    "year": 2021,
+    "observed": -1.98,
+    "control": -0.75,
+    "lower": -2.6,
+    "upper": -1.6,
+    "source": "Sentinel-1",
+    "provisional": false
+  },
+  {
+    "date": "2022-08-15",
+    "year": 2022,
+    "observed": -2.14,
+    "control": -0.79,
+    "lower": -2.78,
+    "upper": -1.78,
+    "source": "Sentinel-1",
+    "provisional": false
+  },
+  {
+    "date": "2023-08-15",
+    "year": 2023,
+    "observed": -2.43,
+    "control": -0.83,
+    "lower": -2.96,
+    "upper": -1.96,
+    "source": "Sentinel-1",
+    "provisional": false
+  },
+  {
+    "date": "2024-08-15",
+    "year": 2024,
+    "observed": -2.75,
+    "control": -0.87,
+    "lower": -3.14,
+    "upper": -2.14,
+    "source": "Sentinel-1",
+    "provisional": false
+  },
+  {
+    "date": "2025-08-15",
+    "year": 2025,
+    "observed": -2.97,
+    "control": -0.91,
+    "lower": -3.32,
+    "upper": -2.32,
+    "source": "Sentinel-1",
+    "provisional": false
+  },
+  {
+    "date": "2026-06-17",
+    "year": 2026.0,
+    "observed": -0.35,
+    "control": -0.22,
+    "lower": -0.73,
+    "upper": 0.03,
+    "source": "NISAR",
+    "provisional": true
+  },
+  {
+    "date": "2026-06-29",
+    "year": 2026.05,
+    "observed": -0.66,
+    "control": -0.3,
+    "lower": -1.04,
+    "upper": -0.28,
+    "source": "NISAR",
+    "provisional": true
+  },
+  {
+    "date": "2026-07-11",
+    "year": 2026.1,
+    "observed": -0.97,
+    "control": -0.38,
+    "lower": -1.35,
+    "upper": -0.59,
+    "source": "NISAR",
+    "provisional": true
+  },
+  {
+    "date": "2026-07-23",
+    "year": 2026.15,
+    "observed": -1.28,
+    "control": -0.46,
+    "lower": -1.66,
+    "upper": -0.9,
+    "source": "NISAR",
+    "provisional": true
+  },
+  {
+    "date": "2026-08-03",
+    "year": 2026.62,
+    "observed": null,
+    "control": null,
+    "lower": null,
+    "upper": null,
+    "source": "NISAR",
+    "provisional": true,
+    "gap": true
+  },
+  {
+    "date": "2026-08-15",
+    "year": 2026,
+    "observed": -3.05,
+    "control": -0.95,
+    "lower": -3.5,
+    "upper": -2.5,
+    "source": "Sentinel-1",
+    "provisional": false
+  },
+  {
+    "date": "2026-08-22",
+    "year": 2026.3,
+    "observed": -2.21,
+    "control": -0.7,
+    "lower": -2.59,
+    "upper": -1.83,
+    "source": "NISAR",
+    "provisional": true
+  },
+  {
+    "date": "2026-09-03",
+    "year": 2026.35,
+    "observed": -2.52,
+    "control": -0.78,
+    "lower": -2.9,
+    "upper": -2.14,
+    "source": "NISAR",
+    "provisional": true
+  },
+  {
+    "date": "2026-09-15",
+    "year": 2026.4,
+    "observed": -2.83,
+    "control": -0.86,
+    "lower": -3.21,
+    "upper": -2.45,
+    "source": "NISAR",
+    "provisional": true
+  }
+]
