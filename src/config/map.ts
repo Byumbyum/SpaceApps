@@ -20,7 +20,7 @@ export const BASEMAPS = {
   },
 } as const;
 
-export const INITIAL_VIEW = { center: [-150, 65] as [number, number], zoom: 3.1 };
+export const INITIAL_VIEW = { center: [88, 32] as [number, number], zoom: 1.6 };
 
 export const MVP_BOUNDS = {
   west: -152,

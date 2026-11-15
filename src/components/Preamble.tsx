@@ -75,7 +75,7 @@ export function Preamble() {
           </div>
           <div className="pre-copy" style={{ opacity: span(p, 0.14, 0.18, 0.27, 0.31) }}>
             <h2 className="pre-big">Countless deaths and even more casualties.</h2>
-            <p className="pre-small" style={{ opacity: ramp(p, 0.18, 0.22) }}>On 26 August this year, flash floods devastated the China–Nepal border. Thawing permafrost was cited as a major contributing factor.</p>
+            <p className="pre-small" style={{ opacity: ramp(p, 0.18, 0.22) }}>Flash floods devastated the China–Nepal border. Thawing permafrost was cited as a major contributing factor.</p>
           </div>
           <div className="pre-copy" style={{ opacity: titleCard }}>
             <h2 className="pre-big">But it doesn’t have to be this way.</h2>
@@ -89,7 +89,7 @@ export function Preamble() {
           </div>
 
           <div className="pre-copy" style={{ opacity: span(p, 0.56, 0.6, 0.93, 0.97) }}>
-            <p className="pre-small pre-over">Similar disasters have been mitigated before. On 28 May 2025, Swiss authorities had already evacuated the village of Blatten when its monitoring stations sounded the alarm.</p>
+            <p className="pre-small pre-over">Similar disasters have been mitigated before. When the Birch Glacier collapsed on 28 May 2025, Swiss authorities had already evacuated the village of Blatten when its monitoring stations sounded the alarm.</p>
           </div>
 
           <div className="pre-cue" style={{ opacity: 1 - ramp(p, 0.02, 0.08) }} aria-hidden="true"><span>Scroll down</span><ChevronIcon /></div>
@@ -103,7 +103,7 @@ export function Preamble() {
       <section className="pre-body">
         <Reveal className="pre-medium"><p>However, not all places in the world have access to this life-saving infrastructure, leading to disasters that could have been mitigated.</p></Reveal>
         <div className="pre-spacer" />
-        <Reveal className="pre-medium"><p><b>Prescience</b> uses NISAR’s radar vision from space to forewarn governments, NGOs and communities, so they can take action before disaster strikes.</p></Reveal>
+        <Reveal className="pre-medium"><p><b>Prescient</b> uses NISAR’s radar vision from space to forewarn governments, NGOs and communities, so they can take action before disaster strikes.</p></Reveal>
 
         <Reveal className="pre-statement">
           <h2>Humanity has the data.</h2>

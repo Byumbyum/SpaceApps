@@ -24,6 +24,7 @@ import path from 'node:path';
 import { PNG } from 'pngjs';
 import { findGranules, harmonySubset, harmonyUrl } from './lib/nasa-sources.mjs';
 import { writeSiteIndex } from './lib/site-index.mjs';
+import { addStefan } from './lib/stefan.mjs';
 import { SITES } from './sites.mjs';
 
 const args = Object.fromEntries(process.argv.slice(2).map((arg) => { const [key, value] = arg.replace(/^--/, '').split('='); return [key, value ?? true]; }));
@@ -241,8 +242,16 @@ const summary = {
   tracks: tracks.map(({ key, track, direction, mode, dates }) => ({ key, track, direction, mode, dates })),
   cells,
 };
+// Stefan thaw model against NASA POWER degree days; the movement still stands without it.
+try {
+  const fitted = await addStefan(summary, SITE);
+  console.log(`Stefan thaw model (√ADDT, NASA POWER temperatures): fitted ${fitted} cells`);
+} catch (error) {
+  console.log(`Stefan thaw model skipped: ${error.message}`);
+}
 writeFileSync(path.join(OUT, 'gunw.json'), JSON.stringify(summary));
 const totals = cells.map((cell) => cell.los[best.key]?.at(-1)).filter((value) => value !== null && value !== undefined);
 console.log(`Wrote ${path.relative(process.cwd(), OUT)}: gunw.json (${cells.length} cells, ${tracks.length} tracks), gunw-motion.png`);
 console.log(`Longest chain ${best.key}: ${best.dates[0]} → ${best.dates.at(-1)}; cell totals median ${round2(median(totals))} cm, range ${round2(Math.min(...totals))} to ${round2(Math.max(...totals))} cm`);
-if (!args.out) writeSiteIndex();
+// Recompute risk zones for every site with ground movement (also refreshes the site index).
+if (!args.out) await import('./risk.mjs');

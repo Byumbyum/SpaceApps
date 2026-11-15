@@ -25,11 +25,14 @@
     "lastDate": "2026-08-31",
     "passCount": 37,
     "changeTracks": 6,
-    "note": null
+    "note": null,
+    "gunw": true,
+    "climate": true,
+    "risk": true
   },
   {
     "id": "barry-arm",
-    "label": "Barry Arm landslide, Alaska",
+    "label": "Barry Arm, Alaska",
     "base": "/data/nisar/barry-arm",
     "corners": [
       [
@@ -53,11 +56,14 @@
     "lastDate": "2026-09-29",
     "passCount": 43,
     "changeTracks": 6,
-    "note": "Mountain site: summer radar change here is dominated by snow and glacier melt, so it is not a permafrost signal on its own."
+    "note": "Mountain site: summer radar change here is dominated by snow and glacier melt, so it is not a permafrost signal on its own.",
+    "gunw": true,
+    "climate": true,
+    "risk": false
   },
   {
     "id": "blatten",
-    "label": "Lötschental (Blatten), Swiss Alps",
+    "label": "Lötschental, Swiss Alps",
     "base": "/data/nisar/blatten",
     "corners": [
       [
@@ -81,7 +87,10 @@
     "lastDate": "2026-09-28",
     "passCount": 29,
     "changeTracks": 4,
-    "note": "Mountain site: summer radar change here is dominated by snow and glacier melt, so it is not a permafrost signal on its own."
+    "note": "Mountain site: summer radar change here is dominated by snow and glacier melt, so it is not a permafrost signal on its own.",
+    "gunw": true,
+    "climate": true,
+    "risk": true
   },
   {
     "id": "hohe-tauern",
@@ -109,11 +118,14 @@
     "lastDate": "2026-09-30",
     "passCount": 15,
     "changeTracks": 1,
-    "note": "Mountain site: summer radar change here is dominated by snow and glacier melt, so it is not a permafrost signal on its own."
+    "note": "Mountain site: summer radar change here is dominated by snow and glacier melt, so it is not a permafrost signal on its own.",
+    "gunw": true,
+    "climate": true,
+    "risk": true
   },
   {
     "id": "gyirong",
-    "label": "Gyirong (Rasuwa outburst flood), Tibet",
+    "label": "Gyirong, Tibet",
     "base": "/data/nisar/gyirong",
     "corners": [
       [
@@ -137,6 +149,164 @@
     "lastDate": "2026-09-28",
     "passCount": 24,
     "changeTracks": 5,
-    "note": "Mountain site: summer radar change here is dominated by snow and glacier melt, so it is not a permafrost signal on its own."
+    "note": "Mountain site: summer radar change here is dominated by snow and glacier melt, so it is not a permafrost signal on its own.",
+    "gunw": true,
+    "climate": true,
+    "risk": true
+  },
+  {
+    "id": "ulaanbaatar",
+    "label": "Ulaanbaatar, Mongolia",
+    "base": "/data/nisar/ulaanbaatar",
+    "corners": [
+      [
+        107.20445,
+        47.86714
+      ],
+      [
+        106.82777,
+        47.73229
+      ],
+      [
+        106.64444,
+        47.96183
+      ],
+      [
+        107.02273,
+        48.0977
+      ]
+    ],
+    "firstDate": "2026-06-18",
+    "lastDate": "2026-09-27",
+    "passCount": 28,
+    "changeTracks": 4,
+    "note": "Discontinuous permafrost at the southern edge of the Siberian zone: frozen ground is patchy here, so movement can come from seasonal frost and construction as well as thaw.",
+    "gunw": true,
+    "climate": true,
+    "risk": true
+  },
+  {
+    "id": "almaty",
+    "label": "Almaty, Kazakhstan",
+    "base": "/data/nisar/almaty",
+    "corners": [
+      [
+        77.30397,
+        43.17901
+      ],
+      [
+        77.05164,
+        42.88481
+      ],
+      [
+        76.64735,
+        43.06923
+      ],
+      [
+        76.89794,
+        43.36513
+      ]
+    ],
+    "firstDate": "2026-06-18",
+    "lastDate": "2026-09-29",
+    "passCount": 27,
+    "changeTracks": 4,
+    "note": "Mountain site: summer radar change here is dominated by snow and glacier melt, so it is not a permafrost signal on its own.",
+    "gunw": true,
+    "climate": true,
+    "risk": true
+  },
+  {
+    "id": "ala-archa",
+    "label": "Ala-Archa, Kyrgyzstan",
+    "base": "/data/nisar/ala-archa",
+    "corners": [
+      [
+        74.81655,
+        42.60079
+      ],
+      [
+        74.62686,
+        42.35482
+      ],
+      [
+        74.28446,
+        42.49808
+      ],
+      [
+        74.4728,
+        42.74515
+      ]
+    ],
+    "firstDate": "2026-06-18",
+    "lastDate": "2026-09-29",
+    "passCount": 31,
+    "changeTracks": 4,
+    "note": "Mountain site: summer radar change here is dominated by snow and glacier melt, so it is not a permafrost signal on its own.",
+    "gunw": true,
+    "climate": true,
+    "risk": true
+  },
+  {
+    "id": "khorog",
+    "label": "Khorog, Tajikistan",
+    "base": "/data/nisar/khorog",
+    "corners": [
+      [
+        71.8511,
+        37.60938
+      ],
+      [
+        71.68967,
+        37.35438
+      ],
+      [
+        71.34996,
+        37.48958
+      ],
+      [
+        71.50996,
+        37.74564
+      ]
+    ],
+    "firstDate": "2026-06-20",
+    "lastDate": "2026-09-29",
+    "passCount": 24,
+    "changeTracks": 5,
+    "note": "Mountain site: summer radar change here is dominated by snow and glacier melt, so it is not a permafrost signal on its own.",
+    "gunw": true,
+    "climate": true,
+    "risk": true
+  },
+  {
+    "id": "hunza",
+    "label": "Hunza valley, Pakistan",
+    "base": "/data/nisar/hunza",
+    "corners": [
+      [
+        74.93342,
+        36.38808
+      ],
+      [
+        74.72641,
+        36.09563
+      ],
+      [
+        74.36777,
+        36.26045
+      ],
+      [
+        74.57325,
+        36.55436
+      ]
+    ],
+    "firstDate": "2026-06-18",
+    "lastDate": "2026-09-29",
+    "passCount": 23,
+    "changeTracks": 4,
+    "note": "Mountain site: summer radar change here is dominated by snow and glacier melt, so it is not a permafrost signal on its own.",
+    "gunw": true,
+    "climate": true,
+    "risk": true
   }
 ]

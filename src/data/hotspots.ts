@@ -1,12 +1,13 @@
-import type { Hotspot } from '../lib/risk';
+import { ipccVulnerability, type Hotspot } from '../lib/risk';
 
 // INDICATIVE ESTIMATES. Factor values (0–1) are set by hand from published reports
 // on each place: hazard from documented thaw damage, erosion or creep; exposure from
-// population and infrastructure; vulnerability from remoteness and building stock;
-// capacity from monitoring and local plans. They are labelled "Estimate" wherever
+// population and infrastructure; vulnerability (IPCC: susceptibility and lack of coping
+// capacity) from remoteness and building stock (vulnerability below) and from monitoring
+// and local plans (capacity below), combined by ipccVulnerability. They are labelled "Estimate" wherever
 // shown, and get replaced by NISAR ground-motion trends and open data (OSM, WorldPop)
 // as each site is processed.
-export const HOTSPOTS: Hotspot[] = [
+const ESTIMATES: Array<Hotspot & { capacity: number }> = [
   { id: 'yakutsk', name: 'Yakutsk', region: 'Sakha Republic, Russia', center: [129.73, 62.03], radiusKm: 25, hazard: 0.8, exposure: 0.85, vulnerability: 0.5, capacity: 0.5,
     hazards: 'City of 350,000 built on piles in ice-rich permafrost; buildings crack as the ground warms.', safety: 'Apartment blocks and pipes deforming', health: 'Burst water and sewage lines', economy: 'Costly foundation repair across the city' },
   { id: 'norilsk', name: 'Norilsk', region: 'Krasnoyarsk Krai, Russia', center: [88.2, 69.35], radiusKm: 30, hazard: 0.8, exposure: 0.8, vulnerability: 0.55, capacity: 0.4,
@@ -20,9 +21,9 @@ export const HOTSPOTS: Hotspot[] = [
   { id: 'mirny', name: 'Mirny', region: 'Sakha Republic, Russia', center: [113.96, 62.53], radiusKm: 15, hazard: 0.65, exposure: 0.55, vulnerability: 0.5, capacity: 0.45,
     hazards: 'Diamond-mining town on continuous permafrost.', safety: 'Housing and pit-wall stability', health: 'Tailings and water quality', economy: 'Mining infrastructure' },
   { id: 'tiksi', name: 'Tiksi', region: 'Sakha Republic, Russia', center: [128.87, 71.64], radiusKm: 10, hazard: 0.75, exposure: 0.35, vulnerability: 0.7, capacity: 0.35,
-    hazards: 'Remote Arctic port with eroding coast and failing buildings.', safety: 'Coastal and building failure', health: 'Isolated from hospitals', economy: 'Port and supply line' },
+    hazards: 'Remote Arctic port where buildings are failing as the ground beneath them thaws.', safety: 'Building failure', health: 'Isolated from hospitals', economy: 'Port and supply line' },
   { id: 'utqiagvik', name: 'Utqiaġvik (Barrow)', region: 'Alaska, United States', center: [-156.79, 71.29], radiusKm: 15, hazard: 0.75, exposure: 0.55, vulnerability: 0.7, capacity: 0.45,
-    hazards: 'Coastal permafrost thaw and storm erosion at the northernmost US town.', safety: 'Coastal erosion near homes', health: 'Water and sewer damage', economy: 'Road and utility repairs' },
+    hazards: 'Permafrost thawing under homes, roads and utilities at the northernmost US town.', safety: 'Ground settling under homes', health: 'Water and sewer damage', economy: 'Road and utility repairs' },
   { id: 'newtok', name: 'Newtok', region: 'Alaska, United States', center: [-164.63, 60.94], radiusKm: 8, hazard: 0.9, exposure: 0.4, vulnerability: 0.9, capacity: 0.3,
     hazards: 'Village moving to Mertarvik as thawing riverbanks erode toward homes.', safety: 'Homes undercut by erosion', health: 'No safe water or sewage', economy: 'Relocation costs' },
   { id: 'shishmaref', name: 'Shishmaref', region: 'Alaska, United States', center: [-166.08, 66.26], radiusKm: 8, hazard: 0.85, exposure: 0.4, vulnerability: 0.85, capacity: 0.3,
@@ -54,7 +55,7 @@ export const HOTSPOTS: Hotspot[] = [
   { id: 'ilulissat', name: 'Ilulissat', region: 'Greenland', center: [-51.1, 69.22], radiusKm: 10, hazard: 0.5, exposure: 0.45, vulnerability: 0.45, capacity: 0.55,
     hazards: 'Town on thawing sediment beside the Icefjord.', safety: 'Foundation damage', health: 'Water supply', economy: 'Tourism base' },
   { id: 'longyearbyen', name: 'Longyearbyen', region: 'Svalbard, Norway', center: [15.63, 78.22], radiusKm: 10, hazard: 0.7, exposure: 0.45, vulnerability: 0.35, capacity: 0.7,
-    hazards: 'Warming permafrost under homes; slope failures and avalanches on thawing hillsides.', safety: 'Slope failure near homes', health: 'Seed vault and water', economy: 'Housing replacement' },
+    hazards: 'Warming permafrost under homes and roads in the world’s northernmost town.', safety: 'Foundations settling under homes', health: 'Seed vault and water', economy: 'Housing replacement' },
   { id: 'blatten', name: 'Lötschental (Blatten)', region: 'Valais, Switzerland', center: [7.82, 46.42], radiusKm: 6, hazard: 0.85, exposure: 0.4, vulnerability: 0.3, capacity: 0.8,
     hazards: 'Thawing rock destabilised the slope above Blatten; the village was buried in May 2025 after evacuation.', safety: 'Rock and ice avalanches', health: 'Displacement', economy: 'Village and roads lost' },
   { id: 'pontresina', name: 'Pontresina', region: 'Graubünden, Switzerland', center: [9.9, 46.49], radiusKm: 5, hazard: 0.6, exposure: 0.45, vulnerability: 0.25, capacity: 0.85,
@@ -65,7 +66,7 @@ export const HOTSPOTS: Hotspot[] = [
     hazards: 'Railway and highway on warm plateau permafrost; embankments cooled to stay frozen.', safety: 'Track and road deformation', health: 'Remote, high altitude', economy: 'Key Tibet supply line' },
   // Lower-income mountain and steppe regions: permafrost risk is not only an Arctic problem.
   { id: 'ulaanbaatar', name: 'Ulaanbaatar ger districts', region: 'Mongolia', center: [106.92, 47.95], radiusKm: 18, hazard: 0.55, exposure: 0.7, vulnerability: 0.75, capacity: 0.35,
-    hazards: 'Discontinuous permafrost is thawing under the capital’s fast-growing informal ger districts.', safety: 'Ground settling under homes and roads', health: 'Pit latrines and wells on thawing ground', economy: 'Unplanned settlements hard to repair' },
+    hazards: 'Discontinuous permafrost is thawing under the capital’s fast-growing informal ger districts.', safety: 'Shallow foundations: walls crack and floors tilt as the ground settles unevenly', health: 'Pit latrines and hand-dug wells on the same thawing ground: sewage can reach drinking water', economy: 'Informal, unplanned homes: no engineering survey before building, little money for repairs' },
   { id: 'huaraz', name: 'Huaraz (Cordillera Blanca)', region: 'Áncash, Peru', center: [-77.53, -9.53], radiusKm: 15, hazard: 0.8, exposure: 0.7, vulnerability: 0.65, capacity: 0.4,
     hazards: 'A city of about 120,000 below growing glacial lakes; a Palcacocha outburst killed more than 1,800 people here in 1941.', safety: 'Glacial lake outburst floods', health: 'Mass-casualty risk downstream', economy: 'Water supply and farming' },
   { id: 'chamoli', name: 'Chamoli (Rishiganga)', region: 'Uttarakhand, India', center: [79.73, 30.4], radiusKm: 12, hazard: 0.8, exposure: 0.5, vulnerability: 0.65, capacity: 0.4,
@@ -78,6 +79,28 @@ export const HOTSPOTS: Hotspot[] = [
     hazards: 'Downstream of the Lunana glacial lakes, whose 1994 outburst flooded the valley; early-warning sirens have since been installed.', safety: 'Glacial lake outburst floods', health: 'Low-lying towns exposed', economy: 'Farmland and the historic dzong' },
   { id: 'almaty', name: 'Almaty foothills', region: 'Kazakhstan', center: [76.95, 43.15], radiusKm: 15, hazard: 0.6, exposure: 0.75, vulnerability: 0.4, capacity: 0.65,
     hazards: 'Debris flows from thawing moraines and glacial lakes in the Ile Alatau above a city of two million; protected by the Medeu dam.', safety: 'Debris flows', health: 'Dense population downstream', economy: 'City and resort infrastructure' },
+  { id: 'ala-archa', name: 'Ala-Archa valley', region: 'Chüy, Kyrgyzstan', center: [74.53, 42.55], radiusKm: 12, hazard: 0.55, exposure: 0.55, vulnerability: 0.55, capacity: 0.45,
+    hazards: 'Rock glaciers and moraine lakes above the valley that drains toward Bishkek’s southern suburbs; mudflows are a recurring threat.', safety: 'Mudflows and debris flows', health: 'Visitors and villages downstream', economy: 'Tourism and water supply' },
+  { id: 'khorog', name: 'Khorog and Barsem', region: 'Gorno-Badakhshan, Tajikistan', center: [71.6, 37.55], radiusKm: 12, hazard: 0.75, exposure: 0.55, vulnerability: 0.75, capacity: 0.3,
+    hazards: 'In July 2015 debris flows from the mountains above Barsem buried homes and dammed the Gunt river near Khorog, the regional capital.', safety: 'Debris flows and river damming', health: 'Remote, limited care', economy: 'Pamir Highway and power supply' },
   { id: 'gyirong', name: 'Gyirong', region: 'Tibet, China', center: [85.33, 28.4], radiusKm: 12, hazard: 0.6, exposure: 0.45, vulnerability: 0.6, capacity: 0.4,
     hazards: 'Mountain border town below thawing slopes and glacial lakes.', safety: 'Landslides and debris flows', health: 'Remote care', economy: 'Trade route to Nepal' },
 ];
+
+// Which climate phenomenon each researched place belongs to. Permafrost thaw here means the
+// local effect: ground thawing under the people and infrastructure standing on it. Coastal
+// erosion, slope creep and downstream cascades are their own phenomena (coming soon).
+const OTHER_PHENOMENA: Record<string, string> = {
+  newtok: 'coastal-erosion', shishmaref: 'coastal-erosion', kivalina: 'coastal-erosion', tuktoyaktuk: 'coastal-erosion',
+  'dalton-fdl': 'landslides', 'barry-arm': 'landslides',
+  blatten: 'thaw-cascades', pontresina: 'thaw-cascades', 'hohe-tauern': 'thaw-cascades', huaraz: 'thaw-cascades',
+  chamoli: 'thaw-cascades', teesta: 'thaw-cascades', hunza: 'thaw-cascades', punakha: 'thaw-cascades',
+  almaty: 'thaw-cascades', 'ala-archa': 'thaw-cascades', khorog: 'thaw-cascades', gyirong: 'thaw-cascades',
+};
+const phenomenonOf = (id: string) => OTHER_PHENOMENA[id] ?? 'permafrost';
+
+/** Places researched for a phenomenon that is not live yet (shown on its "coming soon" card). */
+export const researchedPlaces = (phenomenon: string) => ESTIMATES.filter((spot) => phenomenonOf(spot.id) === phenomenon).map((spot) => spot.name);
+
+/** Permafrost-thaw hotspots (local effects), the ones scored on the map. */
+export const HOTSPOTS: Hotspot[] = ESTIMATES.filter((spot) => phenomenonOf(spot.id) === 'permafrost').map(({ vulnerability, capacity, ...spot }) => ({ ...spot, vulnerability: ipccVulnerability(vulnerability, capacity) }));

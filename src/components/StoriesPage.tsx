@@ -44,6 +44,18 @@ const PERMAFROST_STORIES: Story[] = [
     map: { center: [88.2, 69.35], radiusKm: 30, name: 'Norilsk', region: 'Krasnoyarsk Krai, Russia' },
   },
   {
+    title: 'Nome: roads sink and bridges tilt',
+    place: 'Nome and the Seward Peninsula, Alaska',
+    date: 'December 2019',
+    summary: 'In the northern Bering Sea region, thawing permafrost is breaking up the roads and runways that remote towns depend on. Stretches of the unpaved highway north of Nome crack and collapse each summer, pilings under a bridge on the Nome–Teller road have tilted, a sinkhole about 14 feet deep opened along a Nome road during the hottest July on record, and the state spent about US$4.5 million patching the thawing ground under Nome’s airport runway.',
+    lesson: 'The damage spreads along the infrastructure a town cannot do without. Mapping which stretches are sinking shows where to repair before they fail.',
+    sources: [
+      { label: 'Pulitzer Center: As climate change melts Alaska’s permafrost, roads sink, bridges tilt and greenhouse gases release', href: 'https://pulitzercenter.org/stories/climate-change-melts-alaskas-permafrost-roads-sink-bridges-tilt-and-greenhouse-gases' },
+      { label: 'The Seattle Times, via Phys.org (Hal Bernton, 2019)', href: 'https://phys.org/news/2019-12-climate-alaska-permafrost-roads-bridges.html' },
+    ],
+    map: { center: [-165.41, 64.5], radiusKm: 10, name: 'Nome', region: 'Alaska, United States' },
+  },
+  {
     title: 'Denali’s road, cut by a thawing slope',
     place: 'Denali National Park, Alaska',
     date: '2014 – today',

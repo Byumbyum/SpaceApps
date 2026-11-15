@@ -1,27 +1,31 @@
 import { circleRing, distanceKm, insideRing, type LngLat } from './geo';
-import type { GcovData } from '../types';
+import type { GcovData, NisarSite, RiskData } from '../types';
 
-// Disaster risk as UNDRR (Sendai Framework) and IPCC AR6 define it:
-//   Risk = f(Hazard, Exposure, Vulnerability, Capacity)
-// Neither body fixes a formula. We use an equal-weight geometric mean of
-// H, E, V and (1 − C), so a near-zero factor (nobody exposed, no hazard)
-// pulls risk towards zero, as it should.
+// Climate risk as the IPCC (AR5, AR6) frames it:
+//   Risk = f(Hazard, Exposure, Vulnerability)
+// where vulnerability includes "sensitivity or susceptibility to harm and lack of capacity
+// to cope and adapt". The IPCC fixes no formula, so this is a relative risk index, not a
+// probability. We use an equal-weight geometric mean of H, E and V, so a near-zero factor
+// (nobody exposed, no hazard) pulls risk towards zero, as it should.
 
 export interface RiskFactors {
   /** Physical trigger: thaw-driven ground motion, erosion, slope creep (0–1). */
   hazard: number;
   /** People and assets in harm's way: buildings, roads, pipelines, population (0–1). */
   exposure: number;
-  /** Susceptibility: poverty, age, building type, isolation (0–1). */
+  /** IPCC vulnerability: susceptibility (poverty, age, building type, isolation) and lack of
+   *  capacity to cope (hospitals, monitoring, local plans) (0–1). */
   vulnerability: number;
-  /** Ability to cope: hospitals, monitoring, local plans (0–1, higher is better). */
-  capacity: number;
 }
+
+/** IPCC vulnerability from its two parts: susceptibility and coping capacity (both 0–1). */
+export const ipccVulnerability = (susceptibility: number, copingCapacity: number) =>
+  Math.round(Math.sqrt(Math.max(0, susceptibility) * Math.max(0, 1 - copingCapacity)) * 100) / 100;
 
 export type RiskLevel = 'Low' | 'Moderate' | 'High';
 
-export function riskScore({ hazard, exposure, vulnerability, capacity }: RiskFactors) {
-  const terms = [hazard, exposure, vulnerability, 1 - capacity].map((value) => Math.min(1, Math.max(0.001, value)));
+export function riskScore({ hazard, exposure, vulnerability }: RiskFactors) {
+  const terms = [hazard, exposure, vulnerability].map((value) => Math.min(1, Math.max(0.001, value)));
   return terms.reduce((product, value) => product * value, 1) ** (1 / terms.length);
 }
 
@@ -97,4 +101,42 @@ export function nisarHotspotPoints(gcov: GcovData, ring: LngLat[]): GeoJSON.Feat
     features.push({ type: 'Feature', properties: { weight }, geometry: { type: 'Point', coordinates: cell.center } });
   }
   return { type: 'FeatureCollection', features };
+}
+
+/** Demo hotspots not covered by a site with computed risk (those are replaced by real zones). */
+export function demoHotspots(hotspots: Hotspot[], sites: NisarSite[]) {
+  const computed = sites.filter((site) => site.risk).map((site) => [...site.corners, site.corners[0]] as LngLat[]);
+  return hotspots.filter((spot) => !computed.some((ring) => insideRing(spot.center, ring)));
+}
+
+export interface AreaRisk {
+  score: number;
+  peak: number;
+  hazard: number;
+  exposure: number;
+  vulnerability: number;
+  cellCount: number;
+  atRiskShare: number;
+}
+
+const middle = (values: number[]) => { const sorted = [...values].sort((a, b) => a - b); return sorted[sorted.length >> 1]; };
+
+/** Computed risk over the cells in a selection: median and peak, with the factors behind it. */
+export function areaRisk(risk: RiskData, ring: LngLat[], center: LngLat): AreaRisk | null {
+  let cells = risk.cells.filter((cell) => insideRing(cell.center, ring));
+  if (!cells.length) {
+    const nearest = risk.cells.reduce<RiskData['cells'][number] | null>((best, cell) => (!best || distanceKm(cell.center, center) < distanceKm(best.center, center) ? cell : best), null);
+    if (!nearest || distanceKm(nearest.center, center) > 1.5) return null;
+    cells = [nearest];
+  }
+  const estimate = (text: string) => Number.parseFloat(text);
+  return {
+    score: middle(cells.map((cell) => cell.risk)),
+    peak: Math.max(...cells.map((cell) => cell.risk)),
+    hazard: middle(cells.map((cell) => cell.h)),
+    exposure: middle(cells.map((cell) => cell.e)),
+    vulnerability: estimate(risk.inputs.vulnerability),
+    cellCount: cells.length,
+    atRiskShare: cells.filter((cell) => cell.risk >= 0.4).length / cells.length,
+  };
 }

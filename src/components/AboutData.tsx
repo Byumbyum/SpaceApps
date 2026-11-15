@@ -1,6 +1,7 @@
 import scoringConfig from '../../config/scoring.config.json';
 import type { DemoManifest, ScoringConfig } from '../types';
 import { EvidenceTag } from './EvidenceTag';
+import { HowItWorks } from './HowItWorks';
 
 const config = scoringConfig as ScoringConfig;
 
@@ -17,6 +18,7 @@ const sources = [
 export function AboutData({ manifest }: { manifest: DemoManifest }) {
   return (
     <main id="main-content" className="about-page">
+      <HowItWorks />
       <section className="about-hero"><h1>About the evidence</h1><p>Every number needs a source, date range and quality indicator. This page records the contract the real pipeline must satisfy before a layer can replace the demo.</p></section>
       <section className="about-grid">
         <article className="about-card status-card"><div className="card-heading"><div><h2>Demo manifest</h2></div><EvidenceTag kind="INFERRED" /></div><div className="manifest-facts"><div><span>Processing version</span><b>{manifest.processing_version}</b></div><div><span>Analysis grid</span><b>{manifest.grid.cell_size_m} m · {manifest.grid.crs}</b></div><div><span>NISAR maturity</span><b>{manifest.nisar_status.maturity}</b></div><div><span>Known gap</span><b>27 Jul–10 Aug 2026</b></div></div></article>

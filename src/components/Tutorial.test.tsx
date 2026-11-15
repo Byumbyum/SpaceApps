@@ -8,7 +8,7 @@ describe('tutorial', () => {
 
   it('advances with space, right arrow and click, goes back with left arrow, and exits with Escape', async () => {
     render(<Tutorial />);
-    expect(screen.getByText('Welcome to Prescience')).toBeTruthy();
+    expect(screen.getByText('Welcome to Prescient')).toBeTruthy();
     expect(useAppStore.getState().showHotspots).toBe(true);
     fireEvent.keyDown(window, { key: ' ' });
     expect(screen.getByText('The map')).toBeTruthy();

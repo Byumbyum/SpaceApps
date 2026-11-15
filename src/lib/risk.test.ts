@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { HOTSPOTS } from '../data/hotspots';
 import { circleRing } from './geo';
-import { hotspotFeatures, hotspotsInArea, riskLevel, riskScore } from './risk';
+import { hotspotFeatures, hotspotsInArea, ipccVulnerability, riskLevel, riskScore } from './risk';
 
-describe('risk = f(hazard, exposure, vulnerability, capacity)', () => {
-  it('falls towards zero when nobody is exposed, and capacity lowers risk', () => {
-    const base = { hazard: 0.9, exposure: 0.8, vulnerability: 0.7, capacity: 0.3 };
+describe('risk = f(hazard, exposure, vulnerability) (IPCC)', () => {
+  it('falls towards zero when nobody is exposed, and coping capacity lowers vulnerability', () => {
+    const base = { hazard: 0.9, exposure: 0.8, vulnerability: 0.7 };
     expect(riskScore({ ...base, exposure: 0 })).toBeLessThan(0.2);
-    expect(riskScore({ ...base, capacity: 0.9 })).toBeLessThan(riskScore(base));
+    expect(ipccVulnerability(0.7, 0.9)).toBeLessThan(ipccVulnerability(0.7, 0.3));
     expect(riskLevel(riskScore(base))).toBe('High');
   });
 

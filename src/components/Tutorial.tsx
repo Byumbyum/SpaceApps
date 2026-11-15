@@ -10,13 +10,14 @@ interface Step {
   enter?: () => void;
 }
 
-const YAKUTSK = { name: 'Yakutsk', region: 'Sakha Republic, Russia', center: [129.73, 62.03] as [number, number] };
+// A site with risk computed from NISAR, so the tour shows real zones rather than a demo glow.
+const FOCUS = { name: 'Ulaanbaatar', region: 'Mongolia', center: [106.92, 47.95] as [number, number] };
 
 const store = () => useAppStore.getState();
 
 const STEPS: Step[] = [
   {
-    title: 'Welcome to Prescience',
+    title: 'Welcome to Prescient',
     body: <>A two-minute tour of how this map finds places where thawing ground puts people at risk. Press <kbd>Space</kbd>, <kbd>→</kbd> or click to continue. <kbd>←</kbd> goes back, <kbd>Esc</kbd> skips.</>,
     enter: () => { store().setLayersOpen(false); store().setShowHotspots(true); },
   },
@@ -46,16 +47,21 @@ const STEPS: Step[] = [
   {
     target: ['.map-canvas'],
     title: 'Danger zones in your area',
-    body: 'Inside your area, each hotspot is drawn as a soft red halo with a thin outline. The deeper the red, the more likely the harm: it fades outward like a probability distribution.',
+    body: (
+      <>
+        <p>Hotspots are drawn over the areas at risk. The deeper the red, the more likely the harm.</p>
+        <p className="tour-muted">Where NISAR ground movement is processed, the risk is computed and the outline follows the actual risk area: zoom in and the glow sharpens into zones where moving ground meets buildings. Elsewhere this demo shows a soft glow from a researched estimate.</p>
+      </>
+    ),
     enter: () => {
       store().setNisarLayer('hotspots');
-      if (store().selectedArea?.name !== YAKUTSK.name) store().requestFocus(YAKUTSK.center, 35, YAKUTSK);
+      if (store().selectedArea?.name !== FOCUS.name) store().requestFocus(FOCUS.center, 12, FOCUS);
     },
   },
   {
     target: ['.hotspot-block', '.insights-panel'],
     title: 'Why it is a hotspot',
-    body: 'Each hotspot gets a risk score out of 100, the four factors behind it, and what is at stake for safety, health and the economy.',
+    body: 'Each hotspot gets a risk score out of 100, the three factors behind it, and what is at stake for safety, health and the economy.',
   },
   {
     target: ['.layers-popover', '[data-tour="layers"]'],
@@ -78,13 +84,12 @@ const STEPS: Step[] = [
     title: 'How risk is calculated',
     body: (
       <>
-        <div className="tour-formula">Risk = f(Hazard, Exposure, Vulnerability, Capacity)</div>
-        <p>We use the disaster-risk definition adopted by the UN (UNDRR, Sendai Framework) and the IPCC.</p>
+        <div className="tour-formula">Risk = f(Hazard, Exposure, Vulnerability)</div>
+        <p>We use the climate-risk framework of the IPCC, the UN’s climate science body.</p>
         <ul className="tour-list">
-          <li><b>Hazard</b>Ground motion from NISAR: where it moves, how fast, and whether it is speeding up</li>
+          <li><b>Hazard</b>Permafrost thawing under the ground: permafrost present, ground near 0 °C, and sinking that does not recover year after year (Sentinel-1 since 2016, NISAR from 2026)</li>
           <li><b>Exposure</b>Buildings, roads, pipelines, hospitals and people in the way</li>
-          <li><b>Vulnerability</b>Poverty, age, building type and isolation</li>
-          <li><b>Capacity</b>Hospitals, emergency services, monitoring and local plans</li>
+          <li><b>Vulnerability</b>Poverty, age, building type and isolation, and the capacity to cope: hospitals, emergency services, monitoring and local plans</li>
         </ul>
       </>
     ),

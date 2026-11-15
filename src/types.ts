@@ -137,6 +137,10 @@ export interface NisarSite {
   changeTracks: number;
   /** Ground movement (gunw.json) processed for this site. */
   gunw?: boolean;
+  /** ERA5-Land climate context (climate.json) pulled for this site. */
+  climate?: boolean;
+  /** Computed per-cell risk (risk.json), replacing the demo hotspot inside this site. */
+  risk?: boolean;
   note: string | null;
 }
 
@@ -166,7 +170,30 @@ export interface GunwData {
   nominal_incidence_deg: number;
   corners: [[number, number], [number, number], [number, number], [number, number]];
   map: { file: string; track: string; limit_cm: number; first: string; last: string };
-  tracks: Array<{ key: string; track: string; direction: 'ascending' | 'descending'; mode: string; dates: string[] }>;
+  tracks: Array<{ key: string; track: string; direction: 'ascending' | 'descending'; mode: string; dates: string[]; addt?: Array<number | null>; addtEra5?: Array<number | null> }>;
   /** los[trackKey][i]: cumulative line-of-sight cm at tracks[].dates[i], positive = toward the satellite. */
-  cells: Array<{ id: string; center: [number, number]; los: Record<string, Array<number | null>> }>;
+  /** stefan: fit of the cell's movement to √ADDT (Stefan thaw model); seasonal = cm over the season. */
+  cells: Array<{ id: string; center: [number, number]; los: Record<string, Array<number | null>>; stefan?: { track: string; a: number; r2: number; seasonal: number }; stefanEra5?: { track: string; a: number; r2: number; seasonal: number } }>;
+  thaw_model?: { name: string; temperature: string; addt_reset: string; note: string };
+}
+
+/** public/data/nisar/<site>/climate.json: ERA5-Land context at the site centre. */
+export interface ClimateData {
+  source: string;
+  period: [string, string];
+  years: Array<{ year: number; addt: number; thawOnset: string | null; deepSoilC: number | null }>;
+  current: { year: number; addt: number; addtVsNormalPct: number | null; thawOnset: string | null; thawOnsetVsNormalDays: number | null; deepSoilC: number | null } | null;
+  normal: { years: [number, number] | null; addt: number | null; deepSoilC: number | null };
+  deepSoilTrendPerDecade: number | null;
+}
+
+/** public/data/nisar/<site>/risk.json: risk per 1 km cell from measured hazard and exposure. */
+export interface RiskData {
+  method: string;
+  inputs: { hazard: string; exposure: string; vulnerability: string };
+  levels: number[];
+  /** Where the multi-year (Sentinel-1) trend came from, or null if none for this site yet. */
+  trendSource?: string | null;
+  /** movement: NISAR 2026 seasonal thaw movement (cm); trendCmYr: Sentinel-1 net rate (cm/yr); p: permafrost fraction. */
+  cells: Array<{ id: string; center: [number, number]; movement: number; trendCmYr?: number | null; p?: number; h: number; e: number; risk: number }>;
 }

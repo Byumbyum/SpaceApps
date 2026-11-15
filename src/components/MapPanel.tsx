@@ -8,7 +8,7 @@ import { boxAreaKm2, boxRing, circleRing, formatCoordinate, insideRing, nearestP
 import { reverseGeocode } from '../lib/geocode';
 import { siteFile } from '../lib/nisarSites';
 import { PHENOMENA, PHENOMENON_GROUPS } from '../lib/phenomena';
-import { hotspotFeatures, hotspotPoints, nisarHotspotPoints } from '../lib/risk';
+import { demoHotspots, hotspotPoints, nisarHotspotPoints, riskScore } from '../lib/risk';
 import { clipOverlay, ringTouchesFootprint } from '../lib/overlayClip';
 import { useAppStore, type NisarLayer } from '../store';
 import type { DemoCellProperties, GcovData, GunwData, NisarSite } from '../types';
@@ -46,7 +46,20 @@ const SITE_SELECT_RADIUS_KM = 8;
 const SELECT_RADIUS_PX = 70;
 const LEGEND_CLASSES = [10, 20, 30, 50, 60, 90, 100, 80];
 const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
-const HOTSPOT_LAYERS = ['hotspot-heat', 'hotspot-fill', 'hotspot-line'];
+const HOTSPOT_LAYERS = ['hotspot-heat', 'hotspot-hit', 'risk-site-heat', 'risk-site-hit', 'risk-heat', 'risk-glow', 'risk-fill', 'risk-line'];
+const BAND_NAMES = ['Watch', 'Moderate risk', 'High risk'];
+const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
+
+/** Hover text for a computed zone: what the risk is, and the measurements behind it. */
+function zoneDescription(p: Record<string, number | string>) {
+  const movement = Number(p.movementCm);
+  const moved = Math.abs(movement) < 0.3 ? 'little net movement across the zone, with sinking patches inside' : movement < 0 ? `ground sank about ${Math.abs(movement).toFixed(1)} cm this summer relative to its surroundings` : `ground rose about ${movement.toFixed(1)} cm this summer relative to its surroundings`;
+  return `<div class="zone-tip"><b>${BAND_NAMES[Number(p.band)] ?? 'Risk'} zone</b><span>${escapeHtml(String(p.siteLabel))}</span><p>Peak risk ${Math.round(Number(p.peak) * 100)} / 100 over ${p.cells} km²: ${moved}, and ${p.builtPct}% of it is built up.</p><small>Computed from NISAR ground movement and ESA land cover; vulnerability and capacity are estimates.</small></div>`;
+}
+
+function demoDescription(spot: { name: string; region: string; hazards: string }, score: number) {
+  return `<div class="zone-tip"><b>${escapeHtml(spot.name)}</b><span>${escapeHtml(spot.region)}</span><p>${escapeHtml(spot.hazards)}</p><small>Demo estimate, risk ${Math.round(score * 100)} / 100. Not yet computed from NISAR.</small></div>`;
+}
 // Transparent to deep red: the halo reads as a likelihood of harm, densest at the core.
 const HEAT_COLOR: HeatmapLayerSpecification['paint'] = {
   'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'], 0, 'rgba(234,67,53,0)', 0.25, 'rgba(244,143,130,0.35)', 0.55, 'rgba(234,67,53,0.6)', 1, 'rgba(176,24,20,0.85)'],
@@ -203,24 +216,50 @@ export function MapPanel({ cells, sites, site, gcov, gunw = null }: MapPanelProp
         map.addSource('nisar-footprint', { type: 'geojson', data: { type: 'FeatureCollection', features: sites.map(({ corners }) => ringFeature([...corners, corners[0]])) } });
         map.addLayer({ id: 'nisar-footprint', type: 'line', source: 'nisar-footprint', paint: { 'line-color': '#1a73e8', 'line-width': 1.5, 'line-dasharray': [3, 2], 'line-opacity': 0.8 } } as LineLayerSpecification);
       }
-      // Risk hotspots: a heatmap glow at globe scale that hands over to ringed danger zones.
-      map.addSource('hotspot-points', { type: 'geojson', data: hotspotPoints(HOTSPOTS) });
-      map.addSource('hotspot-zones', { type: 'geojson', data: hotspotFeatures(HOTSPOTS) });
+      // Risk hotspots. Computed zones (NISAR sites with ground movement) follow the land; demo
+      // estimates elsewhere are a soft glow on a point, no rings, until NISAR is processed there.
+      const demo = demoHotspots(HOTSPOTS, sites);
+      map.addSource('hotspot-points', { type: 'geojson', data: hotspotPoints(demo) });
+      map.addSource('risk-zones', { type: 'geojson', data: '/data/nisar/risk-zones.geojson' });
       map.addSource('nisar-hot', { type: 'geojson', data: EMPTY });
-      map.addLayer({ id: 'hotspot-heat', type: 'heatmap', source: 'hotspot-points', maxzoom: 7, paint: {
+      map.addLayer({ id: 'hotspot-heat', type: 'heatmap', source: 'hotspot-points', paint: {
         ...HEAT_COLOR,
         'heatmap-weight': ['get', 'risk'],
-        'heatmap-intensity': 2,
-        'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 1, 12, 3, 30, 6, 56],
-        'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 4.5, 0.9, 6.5, 0],
+        'heatmap-intensity': 1.6,
+        'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 1, 12, 3, 30, 6, 46, 10, 70],
+        'heatmap-opacity': 0.75,
       } } as HeatmapLayerSpecification);
-      map.addLayer({ id: 'hotspot-fill', type: 'fill', source: 'hotspot-zones', paint: {
-        'fill-color': '#d93025',
-        'fill-opacity': ['interpolate', ['linear'], ['zoom'], 4, 0, 5.5, ['*', ['get', 'risk'], ['match', ['get', 'ring'], 0, 0.3, 1, 0.17, 0.08]]],
+      // Invisible targets so a demo glow can be hovered.
+      map.addLayer({ id: 'hotspot-hit', type: 'circle', source: 'hotspot-points', paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, 8, 6, 20, 10, 30], 'circle-opacity': 0 } });
+      const zoneOnly: maplibregl.FilterSpecification = ['==', ['geometry-type'], 'Polygon'];
+      // Zoom morph for computed sites: one glow like every hotspot (far) → a glow per measured
+      // cell that traces the land (mid) → crisp zone outlines (near).
+      map.addLayer({ id: 'risk-site-heat', type: 'heatmap', source: 'risk-zones', filter: ['==', ['get', 'kind'], 'site'], maxzoom: 7.5, paint: {
+        ...HEAT_COLOR,
+        'heatmap-weight': ['get', 'risk'],
+        'heatmap-intensity': 1.6,
+        'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 1, 12, 3, 30, 6, 46],
+        'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 5, 0.75, 7, 0],
+      } } as HeatmapLayerSpecification);
+      map.addLayer({ id: 'risk-site-hit', type: 'circle', source: 'risk-zones', filter: ['==', ['get', 'kind'], 'site'], maxzoom: 7, paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, 8, 6, 20], 'circle-opacity': 0 } });
+      map.addLayer({ id: 'risk-heat', type: 'heatmap', source: 'risk-zones', filter: ['==', ['get', 'kind'], 'cell'], minzoom: 4.5, maxzoom: 10, paint: {
+        ...HEAT_COLOR,
+        'heatmap-weight': ['get', 'risk'],
+        'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 5, 0.35, 7, 0.7, 9, 1],
+        'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 5, 10, 7, 16, 9, 26],
+        'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 5, 0, 6.5, 0.85, 8.5, 0.55, 10, 0],
+      } } as HeatmapLayerSpecification);
+      map.addLayer({ id: 'risk-glow', type: 'line', source: 'risk-zones', filter: ['all', zoneOnly, ['==', ['get', 'band'], 0]], paint: {
+        'line-color': '#d93025', 'line-width': ['interpolate', ['linear'], ['zoom'], 6, 8, 12, 5], 'line-blur': 5, 'line-opacity': ['interpolate', ['linear'], ['zoom'], 6.5, 0, 8, 0.35],
+      } } as LineLayerSpecification);
+      map.addLayer({ id: 'risk-fill', type: 'fill', source: 'risk-zones', filter: zoneOnly, paint: {
+        'fill-color': ['match', ['get', 'band'], 2, '#a50e0e', '#d93025'],
+        'fill-opacity': ['interpolate', ['linear'], ['zoom'], 6.5, 0, 8.5, ['match', ['get', 'band'], 0, 0.2, 1, 0.3, 0.45]],
       } } as FillLayerSpecification);
-      map.addLayer({ id: 'hotspot-line', type: 'line', source: 'hotspot-zones', filter: ['==', ['get', 'ring'], 2], paint: {
-        'line-color': '#d93025', 'line-width': 1.6, 'line-blur': 0.6,
-        'line-opacity': ['interpolate', ['linear'], ['zoom'], 4, 0, 5.5, 0.6],
+      map.addLayer({ id: 'risk-line', type: 'line', source: 'risk-zones', filter: zoneOnly, paint: {
+        'line-color': ['match', ['get', 'band'], 2, '#a50e0e', '#d93025'],
+        'line-width': ['match', ['get', 'band'], 0, 1.8, 1, 2, 2.6],
+        'line-opacity': ['interpolate', ['linear'], ['zoom'], 6.5, 0, 8.5, ['match', ['get', 'band'], 0, 0.8, 0.95]],
       } } as LineLayerSpecification);
       map.addLayer({ id: 'nisar-hot', type: 'heatmap', source: 'nisar-hot', paint: {
         ...HEAT_COLOR,
@@ -274,6 +313,32 @@ export function MapPanel({ cells, sites, site, gcov, gunw = null }: MapPanelProp
     map.on('touchstart', (event) => { if (event.points.length === 1 && startDraw(event.lngLat)) event.preventDefault(); });
     map.on('touchmove', (event) => moveDraw(event.lngLat));
     map.on('touchend', (event) => endDraw(event.lngLat));
+
+    // Hover descriptions: computed zones (the highest band under the cursor) and demo glows.
+    const tip = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 12, maxWidth: '280px', className: 'zone-popup' });
+    map.on('mousemove', 'risk-fill', (event) => {
+      const top = [...(event.features ?? [])].sort((a, b) => Number(b.properties?.band) - Number(a.properties?.band))[0];
+      if (!top?.properties) return;
+      map.getCanvas().style.cursor = 'pointer';
+      tip.setLngLat(event.lngLat).setHTML(zoneDescription(top.properties)).addTo(map);
+    });
+    map.on('mousemove', 'hotspot-hit', (event) => {
+      if (map.queryRenderedFeatures(event.point, { layers: ['risk-fill'] }).length) return;
+      const spot = HOTSPOTS.find((item) => item.id === event.features?.[0]?.properties?.id);
+      if (!spot) return;
+      map.getCanvas().style.cursor = 'pointer';
+      tip.setLngLat(spot.center).setHTML(demoDescription(spot, riskScore(spot))).addTo(map);
+    });
+    map.on('mousemove', 'risk-site-hit', (event) => {
+      const p = event.features?.[0]?.properties;
+      if (!p) return;
+      map.getCanvas().style.cursor = 'pointer';
+      tip.setLngLat(event.lngLat).setHTML(`<div class="zone-tip"><b>${escapeHtml(String(p.siteLabel))}</b><span>Computed from NISAR</span><p>Peak risk ${Math.round(Number(p.risk) * 100)} / 100. Zoom in to see the danger zones, outlined where measured ground movement meets buildings.</p></div>`).addTo(map);
+    });
+    map.on('mouseleave', 'risk-site-hit', () => { tip.remove(); if (!useAppStore.getState().drawing) map.getCanvas().style.cursor = ''; });
+    const hideTip = () => { tip.remove(); if (!useAppStore.getState().drawing) map.getCanvas().style.cursor = ''; };
+    map.on('mouseleave', 'risk-fill', hideTip);
+    map.on('mouseleave', 'hotspot-hit', hideTip);
 
     map.on('click', (event) => {
       if (justDrew || useAppStore.getState().drawing) return;
@@ -407,11 +472,12 @@ export function MapPanel({ cells, sites, site, gcov, gunw = null }: MapPanelProp
                     {PHENOMENA.filter((item) => item.group === group.id).map((item) => (
                       <button key={item.id} className={item.id === 'permafrost' ? 'active' : ''} disabled={!item.available} onClick={() => setShowHotspots(true)}>
                         <b>{item.label}</b>
-                        <span>{item.available ? 'Risk hotspots ready' : 'Coming soon'}</span>
+                        <span>{item.available ? 'Risk hotspots ready' : 'Not in this demo'}</span>
                       </button>
                     ))}
                   </div>
                 ))}
+                <p className="sites-note">Where NISAR ground movement is processed, risk is computed and the zones follow the real shape of the land: zoom in and they sharpen into outlines where measured movement meets buildings. Elsewhere, a soft glow marks a hand-built estimate until NISAR is processed there.</p>
               </div>
             )}
           </div>
@@ -427,7 +493,7 @@ export function MapPanel({ cells, sites, site, gcov, gunw = null }: MapPanelProp
                     <span>{item.passCount} radar passes · {monthRange(item.firstDate, item.lastDate)}</span>
                   </button>
                 ))}
-                <p className="sites-note">Demo only: we processed a small part of NISAR’s data for these five sites. Once fully computed there are no “sites”: every place NISAR surveys, which is nearly all land on Earth, gets the same insights.</p>
+                <p className="sites-note">Demo only: we processed a small part of NISAR’s data for these {sites.length} sites. Once fully computed there are no “sites”: every place NISAR surveys, which is nearly all land on Earth, gets the same insights.</p>
               </div>
             )}
           </div>
@@ -473,10 +539,11 @@ export function MapPanel({ cells, sites, site, gcov, gunw = null }: MapPanelProp
       {hotspotsVisible && !(gcov && overlayShown && shownNisarLayer !== 'none') && status === 'ready' && (
         <div className="map-legend">
           <b>Risk hotspots</b>
-          <span>Risk = f(Hazard, Exposure, Vulnerability, Capacity)</span>
+          {sites.some((item) => item.risk) && <span className="legend-computed"><i />Computed from NISAR: outlines follow the land</span>}
+          <span>Risk = f(Hazard, Exposure, Vulnerability)</span>
           <i className="legend-ramp hotspot-ramp" />
           <div className="legend-ends"><span>Lower</span><span>Likelihood of harm</span><span>Higher</span></div>
-          <small className="legend-note">UNDRR and IPCC risk framework. Factor values are indicative estimates until NISAR ground-motion trends are processed.{areaHotspots && site ? ' Small glows inside your area are NISAR-measured radar change near buildings.' : ''}</small>
+          <small className="legend-note">IPCC climate-risk framework. {sites.some((item) => item.risk) ? 'Elsewhere, a soft glow marks a hand-built estimate until NISAR ground movement is processed there.' : 'Demo: a soft glow marks each hand-built estimate; computed risk will follow the real shape of the land.'}{areaHotspots && site ? ' Small glows inside your area are NISAR-measured radar change near buildings.' : ''}</small>
         </div>
       )}
 

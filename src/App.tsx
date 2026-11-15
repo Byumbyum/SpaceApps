@@ -92,7 +92,7 @@ function Header() {
   return (
     <header className={`app-header ${inMore ? 'in-more' : ''} ${mode === 'preamble' ? 'on-preamble' : ''}`}>
       <div className="header-left">
-        <button className="brand" onClick={() => window.location.reload()} aria-label="Prescience home (reloads the site)"><span className="brand-mark" aria-hidden="true" /><span>Prescience</span></button>
+        <button className="brand" onClick={() => window.location.reload()} aria-label="Prescient home (reloads the site)"><span>Prescient</span></button>
         {inMore && mainNav}
       </div>
       {inMore ? (

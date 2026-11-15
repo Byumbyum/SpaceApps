@@ -15,7 +15,8 @@ export const PHENOMENON_GROUPS: Array<{ id: Phenomenon['group']; label: string; 
 // Permafrost thaw is the active analysis. The others are registered so the
 // interface can grow without layout changes; they show a "coming soon" state.
 export const PHENOMENA: Phenomenon[] = [
-  { id: 'permafrost', label: 'Permafrost thaw', available: true, group: 'predict' },
+  { id: 'permafrost', label: 'Local communities directly affected by permafrost thaw', available: true, group: 'predict' },
+  { id: 'thaw-cascades', label: 'Floods, landslides & avalanches downstream of thawing slopes', available: false, group: 'predict' },
   { id: 'landslides', label: 'Slow landslides & slope creep', available: false, group: 'predict' },
   { id: 'coastal-erosion', label: 'Coastal erosion & subsidence', available: false, group: 'predict' },
   { id: 'land-sinking', label: 'Land sinking from groundwater pumping', available: false, group: 'predict' },

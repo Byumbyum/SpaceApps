@@ -21,19 +21,19 @@ describe('area insights panel', () => {
     expect(useAppStore.getState().analysisOpen).toBe(true);
   });
 
-  it('switches to a coming-soon phenomenon from the bottom toggle', () => {
+  it('switches to a phenomenon not in this demo from the bottom toggle', () => {
     render(<AreaInsights />);
     fireEvent.click(screen.getByRole('button', { name: /Climate phenomenon/ }));
     fireEvent.click(screen.getByRole('button', { name: /Forest loss trends/ }));
     expect(useAppStore.getState().phenomenon).toBe('deforestation');
-    expect(screen.getByText(/coming soon/i)).toBeTruthy();
+    expect(screen.getByText(/not part of this NASA Space Apps demo/i)).toBeTruthy();
   });
 
-  it('ranks mapped risk hotspots in the area with their UN/IPCC factors', () => {
+  it('ranks mapped risk hotspots in the area with their IPCC factors', () => {
     render(<AreaInsights />);
     expect(screen.getByText('Risk hotspot')).toBeTruthy();
     expect(screen.getByText('Prudhoe Bay oil field')).toBeTruthy();
-    for (const factor of ['Hazard', 'Exposure', 'Vulnerability', 'Capacity']) expect(screen.getByText(factor)).toBeTruthy();
+    for (const factor of ['Hazard', 'Exposure', 'Vulnerability']) expect(screen.getByText(factor)).toBeTruthy();
   });
 
   it('groups phenomena into what we can predict and what we can measure', () => {

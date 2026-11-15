@@ -29,6 +29,10 @@ export function writeSiteIndex() {
       note: site.note ?? null,
       // Ground movement from GUNW, when processed for this site.
       gunw: existsSync(path.join(site.out, 'gunw.json')),
+      // ERA5-Land climate context (degree days, soil temperature), when pulled.
+      climate: existsSync(path.join(site.out, 'climate.json')),
+      // Computed per-cell risk (risk.json), replacing the demo hotspot for this site.
+      risk: existsSync(path.join(site.out, 'risk.json')),
     });
   }
   writeFileSync(INDEX, `${JSON.stringify(sites, null, 2)}\n`);
