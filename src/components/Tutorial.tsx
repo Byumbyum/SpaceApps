@@ -16,7 +16,7 @@ const store = () => useAppStore.getState();
 
 const STEPS: Step[] = [
   {
-    title: 'Welcome to Ground Truth North',
+    title: 'Welcome to Prescience',
     body: <>A two-minute tour of how this map finds places where thawing ground puts people at risk. Press <kbd>Space</kbd>, <kbd>→</kbd> or click to continue. <kbd>←</kbd> goes back, <kbd>Esc</kbd> skips.</>,
     enter: () => { store().setLayersOpen(false); store().setShowHotspots(true); },
   },
@@ -34,7 +34,7 @@ const STEPS: Step[] = [
   {
     target: ['[data-tour="hotspots"]'],
     title: 'Risk hotspots, worldwide',
-    body: 'Red glows mark places where permafrost thaw threatens safety, health or livelihoods. This switch shows or hides them across the globe.',
+    body: 'Red glows mark places where permafrost thaw threatens safety, health or livelihoods. This menu turns them on or off, and will switch between climate phenomena as more become ready.',
     enter: () => store().setShowHotspots(true),
   },
   {

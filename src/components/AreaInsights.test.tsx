@@ -43,6 +43,14 @@ describe('area insights panel', () => {
     expect(screen.getByText('What we can measure')).toBeTruthy();
   });
 
+  it('shows no ground data over open ocean', () => {
+    const ocean: [number, number] = [-150, 30];
+    useAppStore.setState({ selectedArea: { id: '2', shape: 'circle', center: ocean, ring: circleRing(ocean, 20), areaKm2: 1257, name: 'Pacific Ocean', region: '' } });
+    render(<AreaInsights />);
+    expect(screen.getByText('Open water')).toBeTruthy();
+    expect(screen.queryByText(/Ground sinking/)).toBeNull();
+  });
+
   it('renders nothing until an area is selected', () => {
     useAppStore.setState({ selectedArea: null });
     const { container } = render(<AreaInsights />);

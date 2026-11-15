@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import { formatArea } from '../lib/geo';
+import { touchesLand } from '../lib/land';
 import { describeChange, summarizeGcov, type GcovSummary } from '../lib/gcov';
-import type { GcovData } from '../types';
+import { summarizeGunw, type GunwSummary } from '../lib/gunw';
+import type { GcovData, GunwData } from '../types';
 import { HOTSPOTS } from '../data/hotspots';
 import { PHENOMENA, PHENOMENON_GROUPS } from '../lib/phenomena';
 import { hotspotsInArea, riskLevel, type Hotspot } from '../lib/risk';
@@ -93,7 +95,28 @@ export function HotspotBlock({ items }: { items: Array<{ spot: Hotspot; score: n
   );
 }
 
-export function AreaInsights({ gcov = null }: { gcov?: GcovData | null }) {
+const day = (date: string) => new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+const signed = (value: number) => `${value > 0 ? '+' : value < 0 ? '−' : ''}${Math.abs(value).toFixed(1)}`;
+
+/** Real ground movement from NISAR GUNW, replacing the sample "ground sinking" value. */
+export function GroundMotionBlock({ summary }: { summary: GunwSummary }) {
+  const away = summary.losCm < 0;
+  return (
+    <div className="ground-motion">
+      <div className="nisar-title"><SatelliteIcon /><b>Ground movement · NISAR</b><span className="evidence evidence-observed">OBSERVED</span><span className="provisional-chip">Provisional</span></div>
+      <div className="hero-metric">
+        <div>
+          <span className="metric-label">{day(summary.first)} – {day(summary.last)}</span>
+          <strong>{signed(summary.losCm)}<small> cm</small></strong>
+          <span className="metric-sub">{Math.abs(summary.losCm) < 0.3 ? 'About stable along the radar’s line of sight' : away ? `Moved away from the satellite: about ${Math.abs(summary.verticalCm).toFixed(1)} cm of sinking if the motion is vertical` : `Moved toward the satellite: about ${Math.abs(summary.verticalCm).toFixed(1)} cm of heave if the motion is vertical`}</span>
+        </div>
+      </div>
+      <p className="nisar-note">Relative to the surrounding area’s median, from {summary.cellCount} km² on track {summary.track} ({summary.direction}). Ionosphere corrected; troposphere not yet.</p>
+    </div>
+  );
+}
+
+export function AreaInsights({ gcov = null, gunw = null }: { gcov?: GcovData | null; gunw?: GunwData | null }) {
   const area = useAppStore((state) => state.selectedArea);
   const setSelectedArea = useAppStore((state) => state.setSelectedArea);
   const setAnalysisOpen = useAppStore((state) => state.setAnalysisOpen);
@@ -102,6 +125,9 @@ export function AreaInsights({ gcov = null }: { gcov?: GcovData | null }) {
   const [othersOpen, setOthersOpen] = useState(false);
   const insight = useMemo(() => (area ? placeholderPermafrost(area.center) : null), [area]);
   const nisar = useMemo(() => (area && gcov ? summarizeGcov(gcov, area.ring, area.center) : null), [area, gcov]);
+  const motion = useMemo(() => (area && gunw ? summarizeGunw(gunw, area.ring, area.center) : null), [area, gunw]);
+  // Ground data only exists on land; open water gets no values at all.
+  const onLand = useMemo(() => (area ? touchesLand(area.center, area.ring) : true), [area]);
   const hotspots = useMemo(() => (area ? hotspotsInArea(HOTSPOTS, area.ring, area.center) : []), [area]);
 
   if (!area || !insight) return null;
@@ -126,6 +152,11 @@ export function AreaInsights({ gcov = null }: { gcov?: GcovData | null }) {
             <p>Insights for {active.label.toLowerCase()} are coming soon.</p>
             <button className="text-link" onClick={() => setPhenomenon('permafrost')}>Back to permafrost thaw</button>
           </div>
+        ) : !onLand ? (
+          <div className="panel-coming-soon">
+            <h3>Open water</h3>
+            <p>No ground data here: ground sinking and permafrost are measured on land only. Select an area on land to see insights.</p>
+          </div>
         ) : !hasPermafrost ? (
           <div className="panel-coming-soon">
             <h3>Little or no permafrost here</h3>
@@ -135,13 +166,15 @@ export function AreaInsights({ gcov = null }: { gcov?: GcovData | null }) {
           <>
             {hotspots.length > 0 && <HotspotBlock items={hotspots} />}
             {nisar && gcov && <NisarBlock summary={nisar} gcov={gcov} />}
-            <div className="hero-metric">
-              <div>
-                <span className="metric-label">Ground sinking <span className="sample-tag">Sample</span></span>
-                <strong>{insight.subsidenceCmYr.toFixed(1)}<small> cm/yr</small></strong>
+            {motion ? <GroundMotionBlock summary={motion} /> : (
+              <div className="hero-metric">
+                <div>
+                  <span className="metric-label">Ground sinking <span className="sample-tag">Sample</span></span>
+                  <strong>{insight.subsidenceCmYr.toFixed(1)}<small> cm/yr</small></strong>
+                </div>
+                <LevelPill level={insight.level} />
               </div>
-              <LevelPill level={insight.level} />
-            </div>
+            )}
             <div className="stat-row">
               <div><strong>{insight.extentPct}%</strong><span>Permafrost cover</span></div>
               <div><strong>+{insight.activeLayerChangeCm} cm</strong><span>Thaw depth / decade</span></div>
@@ -165,7 +198,7 @@ export function AreaInsights({ gcov = null }: { gcov?: GcovData | null }) {
             <button className="primary-action" onClick={() => setAnalysisOpen(true)}>View detailed insights <ArrowRightIcon /></button>
           </>
         )}
-        {active.available && hasPermafrost && <p className="sample-note">{nisar ? 'Values tagged Sample are placeholders until ground-motion (GUNW) data is processed.' : 'Sample values for layout only. Real NISAR data covers the sites outlined on the map.'}</p>}
+        {active.available && onLand && hasPermafrost && <p className="sample-note">{motion ? 'Ground movement and radar brightness are real NISAR measurements (GUNW and GCOV). Values tagged Sample are still placeholders.' : nisar ? 'The NISAR block above is real radar brightness (GCOV). Ground movement (GUNW) is not processed for this spot yet, so values tagged Sample are placeholders.' : 'Sample values for layout only. Real NISAR data covers the sites outlined on the map.'}</p>}
       </div>
 
       <footer className="phenomena">

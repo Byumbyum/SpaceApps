@@ -2,7 +2,7 @@ export type EvidenceKind = 'OBSERVED' | 'INFERRED' | 'PUBLISHED';
 export type IndexKey = 'Q' | 'E';
 export type IndexBand = 'high' | 'medium' | 'low' | 'not-assessed';
 export type ToolMode = 'navigate' | 'select' | 'deselect';
-export type AppMode = 'story' | 'explore' | 'tutorial' | 'about';
+export type AppMode = 'preamble' | 'explore' | 'tutorial' | 'about' | 'disclaimer' | 'stories';
 
 export interface FactorConfig {
   id: string;
@@ -135,6 +135,8 @@ export interface NisarSite {
   lastDate: string;
   passCount: number;
   changeTracks: number;
+  /** Ground movement (gunw.json) processed for this site. */
+  gunw?: boolean;
   note: string | null;
 }
 
@@ -153,4 +155,18 @@ export interface GcovData {
   tracks_in_change_map: number;
   passes: GcovPass[];
   cells: GcovCell[];
+}
+
+/** public/data/nisar/<site>/gunw.json: cumulative ground movement from NISAR GUNW. */
+export interface GunwData {
+  product: string;
+  maturity: 'PROVISIONAL';
+  quantity: string;
+  corrections: Record<string, string>;
+  nominal_incidence_deg: number;
+  corners: [[number, number], [number, number], [number, number], [number, number]];
+  map: { file: string; track: string; limit_cm: number; first: string; last: string };
+  tracks: Array<{ key: string; track: string; direction: 'ascending' | 'descending'; mode: string; dates: string[] }>;
+  /** los[trackKey][i]: cumulative line-of-sight cm at tracks[].dates[i], positive = toward the satellite. */
+  cells: Array<{ id: string; center: [number, number]; los: Record<string, Array<number | null>> }>;
 }

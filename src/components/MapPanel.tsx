@@ -7,10 +7,11 @@ import { BASEMAPS, INITIAL_VIEW, VECTOR_STYLE_URL, type BasemapId } from '../con
 import { boxAreaKm2, boxRing, circleRing, formatCoordinate, insideRing, nearestPlace, type LngLat, type Place, type SelectedArea } from '../lib/geo';
 import { reverseGeocode } from '../lib/geocode';
 import { siteFile } from '../lib/nisarSites';
+import { PHENOMENA, PHENOMENON_GROUPS } from '../lib/phenomena';
 import { hotspotFeatures, hotspotPoints, nisarHotspotPoints } from '../lib/risk';
 import { clipOverlay, ringTouchesFootprint } from '../lib/overlayClip';
 import { useAppStore, type NisarLayer } from '../store';
-import type { DemoCellProperties, GcovData, NisarSite } from '../types';
+import type { DemoCellProperties, GcovData, GunwData, NisarSite } from '../types';
 import { CompassIcon, DrawIcon, HotspotIcon, LayersIcon, MinusIcon, PlusIcon, SatelliteIcon } from './Icons';
 import { MapSearch } from './MapSearch';
 
@@ -28,12 +29,15 @@ interface MapPanelProps {
   /** The site the selected area falls in, and its loaded results. */
   site: NisarSite | null;
   gcov: GcovData | null;
+  /** Ground movement for the site, when GUNW has been processed there. */
+  gunw?: GunwData | null;
 }
 
 type RasterLayer = Exclude<NisarLayer, 'none' | 'hotspots'>;
-const NISAR_LAYERS: Record<RasterLayer, string> = { radar: 'nisar-radar', change: 'nisar-change', landcover: 'nisar-landcover' };
-const NISAR_FILES: Record<RasterLayer, string> = { radar: 'gcov-composite.png', change: 'gcov-change.png', landcover: 'landcover.png' };
+const NISAR_LAYERS: Record<RasterLayer, string> = { motion: 'nisar-motion', radar: 'nisar-radar', change: 'nisar-change', landcover: 'nisar-landcover' };
+const NISAR_FILES: Record<RasterLayer, string> = { motion: 'gunw-motion.png', radar: 'gcov-composite.png', change: 'gcov-change.png', landcover: 'landcover.png' };
 const NISAR_PAINT: Record<RasterLayer, RasterLayerSpecification['paint']> = {
+  motion: { 'raster-opacity': 0.85, 'raster-fade-duration': 0 },
   radar: { 'raster-opacity': 0.9, 'raster-fade-duration': 0 },
   change: { 'raster-opacity': 0.85, 'raster-fade-duration': 0 },
   landcover: { 'raster-opacity': 0.8, 'raster-fade-duration': 0, 'raster-resampling': 'nearest' },
@@ -106,7 +110,7 @@ function monthRange(first: string, last: string) {
   return `${month(first)}–${month(last)} ${last.slice(0, 4)}`;
 }
 
-export function MapPanel({ cells, sites, site, gcov }: MapPanelProps) {
+export function MapPanel({ cells, sites, site, gcov, gunw = null }: MapPanelProps) {
   const container = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const geocodeAbort = useRef<AbortController | null>(null);
@@ -118,6 +122,7 @@ export function MapPanel({ cells, sites, site, gcov }: MapPanelProps) {
   const setShowHotspots = useAppStore((state) => state.setShowHotspots);
   const focusRequest = useAppStore((state) => state.focusRequest);
   const [sitesOpen, setSitesOpen] = useState(false);
+  const [hotspotMenuOpen, setHotspotMenuOpen] = useState(false);
   const basemap = useAppStore((state) => state.basemap);
   const setBasemap = useAppStore((state) => state.setBasemap);
   const drawing = useAppStore((state) => state.drawing);
@@ -205,8 +210,8 @@ export function MapPanel({ cells, sites, site, gcov }: MapPanelProps) {
       map.addLayer({ id: 'hotspot-heat', type: 'heatmap', source: 'hotspot-points', maxzoom: 7, paint: {
         ...HEAT_COLOR,
         'heatmap-weight': ['get', 'risk'],
-        'heatmap-intensity': 1.2,
-        'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 1, 9, 3, 20, 6, 46],
+        'heatmap-intensity': 2,
+        'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 1, 12, 3, 30, 6, 56],
         'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 4.5, 0.9, 6.5, 0],
       } } as HeatmapLayerSpecification);
       map.addLayer({ id: 'hotspot-fill', type: 'fill', source: 'hotspot-zones', paint: {
@@ -297,18 +302,20 @@ export function MapPanel({ cells, sites, site, gcov }: MapPanelProps) {
     const hideAll = () => (Object.values(NISAR_LAYERS)).forEach((layer) => { if (map.getLayer(layer)) map.setLayoutProperty(layer, 'visibility', 'none'); });
     if (map.getLayer('nisar-footprint')) map.setLayoutProperty('nisar-footprint', 'visibility', permafrostView ? 'visible' : 'none');
     const active = shownNisarLayer === 'none' || shownNisarLayer === 'hotspots' ? null : shownNisarLayer;
-    if (!active || !selectedArea || !site || !gcov || (active === 'landcover' && !gcov.landcover) || !ringTouchesFootprint(selectedArea.ring, site.corners)) {
+    if (!active || !selectedArea || !site || !gcov || (active === 'landcover' && !gcov.landcover) || (active === 'motion' && !gunw) || !ringTouchesFootprint(selectedArea.ring, site.corners)) {
       hideAll();
       setOverlayShown(false);
       return;
     }
-    clipOverlay(siteFile(site, NISAR_FILES[active]), site.corners, selectedArea.ring).then((url) => {
+    // Ground movement has its own footprint (GUNW grid); the radar layers share the GCOV one.
+    const corners = active === 'motion' && gunw ? gunw.corners : site.corners;
+    clipOverlay(siteFile(site, NISAR_FILES[active]), corners, selectedArea.ring).then((url) => {
       if (cancelled || !map.getStyle()) return;
       const id = NISAR_LAYERS[active];
       const source = map.getSource(id) as ImageSource | undefined;
-      if (source) source.updateImage({ url, coordinates: site.corners });
+      if (source) source.updateImage({ url, coordinates: corners });
       else {
-        map.addSource(id, { type: 'image', url, coordinates: site.corners });
+        map.addSource(id, { type: 'image', url, coordinates: corners });
         map.addLayer({ id, type: 'raster', source: id, paint: NISAR_PAINT[active] } as RasterLayerSpecification, 'area-fill');
       }
       hideAll();
@@ -316,17 +323,17 @@ export function MapPanel({ cells, sites, site, gcov }: MapPanelProps) {
       setOverlayShown(true);
     }).catch(() => setOverlayShown(false));
     return () => { cancelled = true; };
-  }, [shownNisarLayer, permafrostView, selectedArea, status, site, gcov]);
+  }, [shownNisarLayer, permafrostView, selectedArea, status, site, gcov, gunw]);
 
   // Global hotspots follow the toggle; inside a selection the Hotspots layer always shows them,
   // plus NISAR-measured danger cells where the area falls in a processed site.
   const areaHotspots = shownNisarLayer === 'hotspots' && selectedArea !== null;
-  const hotspotsVisible = permafrostView && (showHotspots || areaHotspots);
+  const hotspotsVisible = permafrostView && showHotspots;
   useEffect(() => {
     const map = mapRef.current;
     if (status !== 'ready' || !map) return;
     HOTSPOT_LAYERS.forEach((id) => map.setLayoutProperty(id, 'visibility', hotspotsVisible ? 'visible' : 'none'));
-    const measured = areaHotspots && site && gcov && selectedArea ? nisarHotspotPoints(gcov, selectedArea.ring) : EMPTY;
+    const measured = hotspotsVisible && areaHotspots && site && gcov && selectedArea ? nisarHotspotPoints(gcov, selectedArea.ring) : EMPTY;
     (map.getSource('nisar-hot') as GeoJSONSource).setData(measured);
   }, [hotspotsVisible, areaHotspots, selectedArea, site, gcov, status]);
 
@@ -383,7 +390,32 @@ export function MapPanel({ cells, sites, site, gcov }: MapPanelProps) {
       <div className="map-top-left">
         <MapSearch onPick={flyToPlace} />
         <button className={`chip ${drawing ? 'active' : ''}`} data-tour="draw" onClick={() => setDrawing(!drawing)} aria-pressed={drawing}><DrawIcon />Draw area</button>
-        {permafrostView && <button className={`chip hotspot-chip ${showHotspots ? 'active' : ''}`} data-tour="hotspots" onClick={() => setShowHotspots(!showHotspots)} aria-pressed={showHotspots}><HotspotIcon />Risk hotspots<small>{showHotspots ? 'On' : 'Off'}</small></button>}
+        {permafrostView && (
+          <div className="sites-menu" data-tour="hotspots" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setHotspotMenuOpen(false); }}>
+            <button className={`chip hotspot-chip ${showHotspots ? 'active' : ''}`} onClick={() => setHotspotMenuOpen(!hotspotMenuOpen)} aria-expanded={hotspotMenuOpen}>
+              <HotspotIcon />Permafrost risk hotspots<small>{showHotspots ? 'On' : 'Off'}</small>
+            </button>
+            {hotspotMenuOpen && (
+              <div className="sites-popover hotspot-popover">
+                <label className="hotspot-switch">
+                  <span><b>Show hotspots</b><small>Across the globe and inside your area</small></span>
+                  <input type="checkbox" role="switch" checked={showHotspots} onChange={(event) => setShowHotspots(event.target.checked)} />
+                </label>
+                {PHENOMENON_GROUPS.map((group) => (
+                  <div key={group.id} className="hotspot-group">
+                    <small className="hotspot-group-label">{group.label}</small>
+                    {PHENOMENA.filter((item) => item.group === group.id).map((item) => (
+                      <button key={item.id} className={item.id === 'permafrost' ? 'active' : ''} disabled={!item.available} onClick={() => setShowHotspots(true)}>
+                        <b>{item.label}</b>
+                        <span>{item.available ? 'Risk hotspots ready' : 'Coming soon'}</span>
+                      </button>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {sites.length > 0 && permafrostView && (
           <div className="sites-menu" data-tour="sites">
             <button className={`chip ${sitesOpen ? 'active' : ''}`} onClick={() => setSitesOpen(!sitesOpen)} aria-expanded={sitesOpen}><SatelliteIcon />NISAR sites · {sites.length}</button>
@@ -395,6 +427,7 @@ export function MapPanel({ cells, sites, site, gcov }: MapPanelProps) {
                     <span>{item.passCount} radar passes · {monthRange(item.firstDate, item.lastDate)}</span>
                   </button>
                 ))}
+                <p className="sites-note">Demo only: we processed a small part of NISAR’s data for these five sites. Once fully computed there are no “sites”: every place NISAR surveys, which is nearly all land on Earth, gets the same insights.</p>
               </div>
             )}
           </div>
@@ -411,6 +444,14 @@ export function MapPanel({ cells, sites, site, gcov }: MapPanelProps) {
                 {Object.entries(gcov.landcover.classes).filter(([code]) => LEGEND_CLASSES.includes(Number(code))).map(([code, entry]) => <li key={code}><i style={{ background: entry.color }} />{entry.label}</li>)}
               </ul>
               <small className="legend-note">Permanent water is excluded from permafrost statistics. Built-up areas are kept to show infrastructure at risk.</small>
+            </>
+          ) : shownNisarLayer === 'motion' && gunw ? (
+            <>
+              <b>Ground movement (NISAR GUNW)</b>
+              <span>{gunw.map.first} → {gunw.map.last} · track {gunw.map.track.split('|')[0]}</span>
+              <i className="legend-ramp motion-ramp" />
+              <div className="legend-ends"><span>Away ≥{gunw.map.limit_cm} cm</span><span>Stable</span><span>Toward</span></div>
+              <small className="legend-note">Movement along the radar’s line of sight, relative to the area’s median. Away from the satellite (red) is usually sinking. Ionosphere corrected; provisional.</small>
             </>
           ) : shownNisarLayer === 'change' ? (
             <>
@@ -462,8 +503,8 @@ export function MapPanel({ cells, sites, site, gcov }: MapPanelProps) {
               {permafrostView && (
                 <fieldset className="layer-radios">
                   <legend>Area layer{site ? ` · ${site.label}` : ''}<small>Shown inside the area you select. NISAR radar layers need an outlined NISAR site.</small></legend>
-                  {([['hotspots', 'Risk hotspots & danger zones'], ...(sites.length ? [['change', 'NISAR summer brightness change'], ['radar', 'NISAR radar image']] : []), ...(sites.length && (!gcov || gcov.landcover) ? [['landcover', 'Land cover (ESA WorldCover)']] : []), ['none', 'Off']] as Array<[NisarLayer, string]>).map(([id, label]) => (
-                    <label key={id}><input type="radio" name="nisar-layer" checked={nisarLayer === id} onChange={() => setNisarLayer(id)} /><span>{label}</span></label>
+                  {([['hotspots', 'Risk hotspots & danger zones'], ...(gunw ? [['motion', 'NISAR ground movement (GUNW)']] : []), ...(sites.length ? [['change', 'NISAR summer brightness change'], ['radar', 'NISAR radar image']] : []), ...(sites.length && (!gcov || gcov.landcover) ? [['landcover', 'Land cover (ESA WorldCover)']] : []), ['none', 'Off']] as Array<[NisarLayer, string]>).map(([id, label]) => (
+                    <label key={id}><input type="radio" name="nisar-layer" checked={nisarLayer === id} onChange={() => { setNisarLayer(id); if (id === 'hotspots') setShowHotspots(true); }} /><span>{label}</span></label>
                   ))}
                 </fieldset>
               )}

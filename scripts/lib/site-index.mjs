@@ -27,6 +27,8 @@ export function writeSiteIndex() {
       passCount: gcov.passes.length,
       changeTracks: gcov.tracks_in_change_map,
       note: site.note ?? null,
+      // Ground movement from GUNW, when processed for this site.
+      gunw: existsSync(path.join(site.out, 'gunw.json')),
     });
   }
   writeFileSync(INDEX, `${JSON.stringify(sites, null, 2)}\n`);

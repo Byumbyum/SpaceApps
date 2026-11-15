@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAppStore } from '../store';
-import type { GcovData, NisarSite } from '../types';
+import type { GcovData, GunwData, NisarSite } from '../types';
 import type { LngLat } from './geo';
 import { ringTouchesFootprint } from './overlayClip';
 
@@ -24,17 +24,29 @@ function loadSiteGcov(site: NisarSite) {
   return loaded.get(site.id)!;
 }
 
+const loadedGunw = new Map<string, Promise<GunwData | null>>();
+function loadSiteGunw(site: NisarSite) {
+  if (!site.gunw) return Promise.resolve(null);
+  if (!loadedGunw.has(site.id)) {
+    loadedGunw.set(site.id, fetch(siteFile(site, 'gunw.json'))
+      .then((response) => (response.ok ? (response.json() as Promise<GunwData>) : null))
+      .catch(() => null));
+  }
+  return loadedGunw.get(site.id)!;
+}
+
 export function useSiteGcov(sites: NisarSite[]) {
   const ring = useAppStore((state) => state.selectedArea?.ring);
   const site = useMemo(() => siteForArea(sites, ring), [sites, ring]);
-  const [result, setResult] = useState<{ id: string; gcov: GcovData | null } | null>(null);
+  const [result, setResult] = useState<{ id: string; gcov: GcovData | null; gunw: GunwData | null } | null>(null);
 
   useEffect(() => {
     if (!site) return;
     let cancelled = false;
-    void loadSiteGcov(site).then((gcov) => { if (!cancelled) setResult({ id: site.id, gcov }); });
+    void Promise.all([loadSiteGcov(site), loadSiteGunw(site)]).then(([gcov, gunw]) => { if (!cancelled) setResult({ id: site.id, gcov, gunw }); });
     return () => { cancelled = true; };
   }, [site]);
 
-  return { site, gcov: site && result?.id === site.id ? result.gcov : null };
+  const current = site && result?.id === site.id ? result : null;
+  return { site, gcov: current?.gcov ?? null, gunw: current?.gunw ?? null };
 }

@@ -1,14 +1,14 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useAppStore } from '../store';
 import { Tutorial } from './Tutorial';
 
 describe('tutorial', () => {
-  beforeEach(() => useAppStore.setState({ mode: 'tutorial', selectedArea: null, showHotspots: false }));
+  beforeEach(() => useAppStore.setState({ mode: 'tutorial', genie: null, selectedArea: null, showHotspots: false }));
 
-  it('advances with space, right arrow and click, goes back with left arrow, and exits with Escape', () => {
+  it('advances with space, right arrow and click, goes back with left arrow, and exits with Escape', async () => {
     render(<Tutorial />);
-    expect(screen.getByText('Welcome to Ground Truth North')).toBeTruthy();
+    expect(screen.getByText('Welcome to Prescience')).toBeTruthy();
     expect(useAppStore.getState().showHotspots).toBe(true);
     fireEvent.keyDown(window, { key: ' ' });
     expect(screen.getByText('The map')).toBeTruthy();
@@ -19,6 +19,8 @@ describe('tutorial', () => {
     fireEvent.keyDown(window, { key: 'ArrowLeft' });
     expect(screen.getByText('Search anywhere')).toBeTruthy();
     fireEvent.keyDown(window, { key: 'Escape' });
-    expect(useAppStore.getState().mode).toBe('explore');
+    // Closing folds the page back into the corner first.
+    expect(useAppStore.getState().genie).toBe('close');
+    await waitFor(() => expect(useAppStore.getState().mode).toBe('explore'), { timeout: 2500 });
   });
 });
