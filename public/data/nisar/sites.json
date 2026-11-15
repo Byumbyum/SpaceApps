@@ -28,6 +28,34 @@
     "note": null
   },
   {
+    "id": "barry-arm",
+    "label": "Barry Arm landslide, Alaska",
+    "base": "/data/nisar/barry-arm",
+    "corners": [
+      [
+        -148.23951,
+        61.07859
+      ],
+      [
+        -148.29616,
+        61.19474
+      ],
+      [
+        -148.0603,
+        61.22138
+      ],
+      [
+        -148.00459,
+        61.10511
+      ]
+    ],
+    "firstDate": "2026-06-20",
+    "lastDate": "2026-09-29",
+    "passCount": 43,
+    "changeTracks": 6,
+    "note": "Mountain site: summer radar change here is dominated by snow and glacier melt, so it is not a permafrost signal on its own."
+  },
+  {
     "id": "blatten",
     "label": "Lötschental (Blatten), Swiss Alps",
     "base": "/data/nisar/blatten",
