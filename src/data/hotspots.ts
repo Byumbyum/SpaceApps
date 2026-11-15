@@ -102,5 +102,8 @@ const phenomenonOf = (id: string) => OTHER_PHENOMENA[id] ?? 'permafrost';
 /** Places researched for a phenomenon that is not live yet (shown on its "coming soon" card). */
 export const researchedPlaces = (phenomenon: string) => ESTIMATES.filter((spot) => phenomenonOf(spot.id) === phenomenon).map((spot) => spot.name);
 
+/** Researched places for a phenomenon, as map hotspots (estimates). */
+export const hotspotsFor = (phenomenon: string): Hotspot[] => ESTIMATES.filter((spot) => phenomenonOf(spot.id) === phenomenon).map(({ vulnerability, capacity, ...spot }) => ({ ...spot, vulnerability: ipccVulnerability(vulnerability, capacity) }));
+
 /** Permafrost-thaw hotspots (local effects), the ones scored on the map. */
 export const HOTSPOTS: Hotspot[] = ESTIMATES.filter((spot) => phenomenonOf(spot.id) === 'permafrost').map(({ vulnerability, capacity, ...spot }) => ({ ...spot, vulnerability: ipccVulnerability(vulnerability, capacity) }));

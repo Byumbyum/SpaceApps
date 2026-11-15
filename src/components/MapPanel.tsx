@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import type { FillLayerSpecification, GeoJSONSource, HeatmapLayerSpecification, ImageSource, LineLayerSpecification, RasterLayerSpecification } from 'maplibre-gl';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
-import { HOTSPOTS } from '../data/hotspots';
+import { HOTSPOTS, hotspotsFor } from '../data/hotspots';
 import { BASEMAPS, INITIAL_VIEW, VECTOR_STYLE_URL, type BasemapId } from '../config/map';
 import { boxAreaKm2, boxRing, circleRing, formatCoordinate, insideRing, nearestPlace, type LngLat, type Place, type SelectedArea } from '../lib/geo';
 import { reverseGeocode } from '../lib/geocode';
@@ -144,6 +144,9 @@ export function MapPanel({ cells, sites, site, gcov, gunw = null }: MapPanelProp
   const nisarLayer = useAppStore((state) => state.nisarLayer);
   // NISAR permafrost layers belong to the permafrost view only.
   const permafrostView = useAppStore((state) => state.phenomenon === 'permafrost');
+  const phenomenon = useAppStore((state) => state.phenomenon);
+  // Researched places of a phenomenon that is not live yet: shown as demo glows only.
+  const otherSpots = permafrostView ? [] : hotspotsFor(phenomenon);
   const shownNisarLayer: NisarLayer = permafrostView ? nisarLayer : 'none';
   const setNisarLayer = useAppStore((state) => state.setNisarLayer);
   // Overlays are drawn only inside the selected circle or rectangle.
@@ -324,7 +327,8 @@ export function MapPanel({ cells, sites, site, gcov, gunw = null }: MapPanelProp
     });
     map.on('mousemove', 'hotspot-hit', (event) => {
       if (map.queryRenderedFeatures(event.point, { layers: ['risk-fill'] }).length) return;
-      const spot = HOTSPOTS.find((item) => item.id === event.features?.[0]?.properties?.id);
+      const id = event.features?.[0]?.properties?.id;
+      const spot = HOTSPOTS.find((item) => item.id === id) ?? ['coastal-erosion', 'landslides', 'thaw-cascades'].flatMap(hotspotsFor).find((item) => item.id === id);
       if (!spot) return;
       map.getCanvas().style.cursor = 'pointer';
       tip.setLngLat(spot.center).setHTML(demoDescription(spot, riskScore(spot))).addTo(map);
@@ -393,14 +397,15 @@ export function MapPanel({ cells, sites, site, gcov, gunw = null }: MapPanelProp
   // Global hotspots follow the toggle; inside a selection the Hotspots layer always shows them,
   // plus NISAR-measured danger cells where the area falls in a processed site.
   const areaHotspots = shownNisarLayer === 'hotspots' && selectedArea !== null;
-  const hotspotsVisible = permafrostView && showHotspots;
+  const hotspotsVisible = (permafrostView || otherSpots.length > 0) && showHotspots;
   useEffect(() => {
     const map = mapRef.current;
     if (status !== 'ready' || !map) return;
-    HOTSPOT_LAYERS.forEach((id) => map.setLayoutProperty(id, 'visibility', hotspotsVisible ? 'visible' : 'none'));
+    HOTSPOT_LAYERS.forEach((id) => map.setLayoutProperty(id, 'visibility', hotspotsVisible && (permafrostView || id.startsWith('hotspot-')) ? 'visible' : 'none'));
+    (map.getSource('hotspot-points') as GeoJSONSource | undefined)?.setData(hotspotPoints(permafrostView ? demoHotspots(HOTSPOTS, sites) : otherSpots));
     const measured = hotspotsVisible && areaHotspots && site && gcov && selectedArea ? nisarHotspotPoints(gcov, selectedArea.ring) : EMPTY;
     (map.getSource('nisar-hot') as GeoJSONSource).setData(measured);
-  }, [hotspotsVisible, areaHotspots, selectedArea, site, gcov, status]);
+  }, [hotspotsVisible, areaHotspots, selectedArea, site, gcov, status, phenomenon]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -472,7 +477,7 @@ export function MapPanel({ cells, sites, site, gcov, gunw = null }: MapPanelProp
                     {PHENOMENA.filter((item) => item.group === group.id).map((item) => (
                       <button key={item.id} className={item.id === 'permafrost' ? 'active' : ''} disabled={!item.available} onClick={() => setShowHotspots(true)}>
                         <b>{item.label}</b>
-                        <span>{item.available ? 'Risk hotspots ready' : 'Not in this demo'}</span>
+                        <span>{item.available ? 'Risk hotspots ready' : hotspotsFor(item.id).length ? 'Researched places (demo)' : 'Coming soon'}</span>
                       </button>
                     ))}
                   </div>
@@ -483,7 +488,7 @@ export function MapPanel({ cells, sites, site, gcov, gunw = null }: MapPanelProp
           </div>
         )}
         {sites.length > 0 && permafrostView && (
-          <div className="sites-menu" data-tour="sites">
+          <div className="sites-menu" data-tour="sites" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setSitesOpen(false); }}>
             <button className={`chip ${sitesOpen ? 'active' : ''}`} onClick={() => setSitesOpen(!sitesOpen)} aria-expanded={sitesOpen}><SatelliteIcon />NISAR sites · {sites.length}</button>
             {sitesOpen && (
               <div className="sites-popover">
