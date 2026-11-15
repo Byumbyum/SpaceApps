@@ -1,13 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as maplibregl from 'maplibre-gl';
-import type { FillLayerSpecification, GeoJSONSource, GeoJSONSourceSpecification, LineLayerSpecification } from 'maplibre-gl';
+import type { FillLayerSpecification, GeoJSONSource, HeatmapLayerSpecification, ImageSource, LineLayerSpecification, RasterLayerSpecification } from 'maplibre-gl';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
-import { BASEMAPS, INITIAL_VIEW, MVP_BOUNDS, VECTOR_STYLE_URL, type BasemapId } from '../config/map';
-import { boxAreaKm2, boxRing, circleRing, formatCoordinate, nearestPlace, type LngLat, type Place, type SelectedArea } from '../lib/geo';
+import { HOTSPOTS } from '../data/hotspots';
+import { BASEMAPS, INITIAL_VIEW, VECTOR_STYLE_URL, type BasemapId } from '../config/map';
+import { boxAreaKm2, boxRing, circleRing, formatCoordinate, insideRing, nearestPlace, type LngLat, type Place, type SelectedArea } from '../lib/geo';
 import { reverseGeocode } from '../lib/geocode';
-import { useAppStore } from '../store';
-import type { DemoCellProperties, SegmentProperties } from '../types';
-import { CompassIcon, DrawIcon, LayersIcon, MinusIcon, PlusIcon } from './Icons';
+import { siteFile } from '../lib/nisarSites';
+import { PHENOMENA, PHENOMENON_GROUPS } from '../lib/phenomena';
+import { demoHotspots, hotspotPoints, nisarHotspotPoints, riskScore } from '../lib/risk';
+import { clipOverlay, ringTouchesFootprint } from '../lib/overlayClip';
+import { useAppStore, type NisarLayer } from '../store';
+import type { DemoCellProperties, GcovData, GunwData, NisarSite } from '../types';
+import { CompassIcon, DrawIcon, HotspotIcon, LayersIcon, MinusIcon, PlusIcon, SatelliteIcon } from './Icons';
 import { MapSearch } from './MapSearch';
 
 // MapLibre locates its worker relative to its own module, which breaks once Vite
@@ -19,12 +24,46 @@ type Collection<P> = { type: 'FeatureCollection'; features: Array<Feature<P>> };
 
 interface MapPanelProps {
   cells: Collection<DemoCellProperties>;
-  segments: Collection<SegmentProperties>;
+  /** Every processed NISAR site (outlined on the map). */
+  sites: NisarSite[];
+  /** The site the selected area falls in, and its loaded results. */
+  site: NisarSite | null;
+  gcov: GcovData | null;
+  /** Ground movement for the site, when GUNW has been processed there. */
+  gunw?: GunwData | null;
 }
 
-const DEMO_LAYERS = ['demo-cells', 'demo-highway', 'demo-pipeline', 'demo-extent'];
+type RasterLayer = Exclude<NisarLayer, 'none' | 'hotspots'>;
+const NISAR_LAYERS: Record<RasterLayer, string> = { motion: 'nisar-motion', radar: 'nisar-radar', change: 'nisar-change', landcover: 'nisar-landcover' };
+const NISAR_FILES: Record<RasterLayer, string> = { motion: 'gunw-motion.png', radar: 'gcov-composite.png', change: 'gcov-change.png', landcover: 'landcover.png' };
+const NISAR_PAINT: Record<RasterLayer, RasterLayerSpecification['paint']> = {
+  motion: { 'raster-opacity': 0.85, 'raster-fade-duration': 0 },
+  radar: { 'raster-opacity': 0.9, 'raster-fade-duration': 0 },
+  change: { 'raster-opacity': 0.85, 'raster-fade-duration': 0 },
+  landcover: { 'raster-opacity': 0.8, 'raster-fade-duration': 0, 'raster-resampling': 'nearest' },
+};
+const SITE_SELECT_RADIUS_KM = 8;
 const SELECT_RADIUS_PX = 70;
+const LEGEND_CLASSES = [10, 20, 30, 50, 60, 90, 100, 80];
 const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
+const HOTSPOT_LAYERS = ['hotspot-heat', 'hotspot-hit', 'risk-site-heat', 'risk-site-hit', 'risk-heat', 'risk-glow', 'risk-fill', 'risk-line'];
+const BAND_NAMES = ['Watch', 'Moderate risk', 'High risk'];
+const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
+
+/** Hover text for a computed zone: what the risk is, and the measurements behind it. */
+function zoneDescription(p: Record<string, number | string>) {
+  const movement = Number(p.movementCm);
+  const moved = Math.abs(movement) < 0.3 ? 'little net movement across the zone, with sinking patches inside' : movement < 0 ? `ground sank about ${Math.abs(movement).toFixed(1)} cm this summer relative to its surroundings` : `ground rose about ${movement.toFixed(1)} cm this summer relative to its surroundings`;
+  return `<div class="zone-tip"><b>${BAND_NAMES[Number(p.band)] ?? 'Risk'} zone</b><span>${escapeHtml(String(p.siteLabel))}</span><p>Peak risk ${Math.round(Number(p.peak) * 100)} / 100 over ${p.cells} km²: ${moved}, and ${p.builtPct}% of it is built up.</p><small>Computed from NISAR ground movement and ESA land cover; vulnerability and capacity are estimates.</small></div>`;
+}
+
+function demoDescription(spot: { name: string; region: string; hazards: string }, score: number) {
+  return `<div class="zone-tip"><b>${escapeHtml(spot.name)}</b><span>${escapeHtml(spot.region)}</span><p>${escapeHtml(spot.hazards)}</p><small>Demo estimate, risk ${Math.round(score * 100)} / 100. Not yet computed from NISAR.</small></div>`;
+}
+// Transparent to deep red: the halo reads as a likelihood of harm, densest at the core.
+const HEAT_COLOR: HeatmapLayerSpecification['paint'] = {
+  'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'], 0, 'rgba(234,67,53,0)', 0.25, 'rgba(244,143,130,0.35)', 0.55, 'rgba(234,67,53,0.6)', 1, 'rgba(176,24,20,0.85)'],
+};
 
 // Vector layers hidden in satellite mode; roads, boundaries and labels stay on top of the imagery.
 const HIDDEN_IN_SATELLITE = new Set(['fill', 'fill-extrusion', 'raster', 'hillshade']);
@@ -60,40 +99,55 @@ function applyBasemap(map: maplibregl.Map, basemap: BasemapId) {
   const satellite = basemap === 'satellite';
   for (const layer of map.getStyle().layers) {
     if (layer.id === 'basemap-satellite') map.setLayoutProperty(layer.id, 'visibility', satellite ? 'visible' : 'none');
-    else if (HIDDEN_IN_SATELLITE.has(layer.type) && !layer.id.startsWith('demo-') && !layer.id.startsWith('area-') && !layer.id.startsWith('draft-')) map.setLayoutProperty(layer.id, 'visibility', satellite ? 'none' : 'visible');
+    else if (HIDDEN_IN_SATELLITE.has(layer.type) && !/^(area|draft|nisar)-/.test(layer.id)) map.setLayoutProperty(layer.id, 'visibility', satellite ? 'none' : 'visible');
   }
+}
+
+// "Before" and "after" are the passes either side of the NISAR thaw-season gap.
+function changePeriods(gcov: GcovData) {
+  const day = (date: string) => new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  const before = gcov.passes.filter((pass) => pass.date < gcov.gap[0]).map((pass) => pass.date);
+  const after = gcov.passes.filter((pass) => pass.date > gcov.gap[1]).map((pass) => pass.date);
+  if (!before.length || !after.length) return 'Early vs late summer';
+  return `Before: ${day(before[0])} – ${day(before[before.length - 1])} · After: ${day(after[0])} – ${day(after[after.length - 1])}`;
 }
 
 function metersPerPixel(lat: number, zoom: number) {
   return (40075016.686 * Math.cos((lat * Math.PI) / 180)) / (512 * 2 ** zoom);
 }
 
-function insideRing([x, y]: LngLat, ring: LngLat[]) {
-  let inside = false;
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
-    const [xi, yi] = ring[i];
-    const [xj, yj] = ring[j];
-    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
-  }
-  return inside;
-}
-
 const ringFeature = (ring: LngLat[]): GeoJSON.Feature => ({ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [ring] } });
 
-export function MapPanel({ cells, segments }: MapPanelProps) {
+function monthRange(first: string, last: string) {
+  const month = (date: string) => new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' });
+  return `${month(first)}–${month(last)} ${last.slice(0, 4)}`;
+}
+
+export function MapPanel({ cells, sites, site, gcov, gunw = null }: MapPanelProps) {
   const container = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const geocodeAbort = useRef<AbortController | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [bearing, setBearing] = useState(0);
-  const [layersOpen, setLayersOpen] = useState(false);
+  const layersOpen = useAppStore((state) => state.layersOpen);
+  const setLayersOpen = useAppStore((state) => state.setLayersOpen);
+  const showHotspots = useAppStore((state) => state.showHotspots);
+  const setShowHotspots = useAppStore((state) => state.setShowHotspots);
+  const focusRequest = useAppStore((state) => state.focusRequest);
+  const [sitesOpen, setSitesOpen] = useState(false);
+  const [hotspotMenuOpen, setHotspotMenuOpen] = useState(false);
   const basemap = useAppStore((state) => state.basemap);
   const setBasemap = useAppStore((state) => state.setBasemap);
   const drawing = useAppStore((state) => state.drawing);
   const setDrawing = useAppStore((state) => state.setDrawing);
   const selectedArea = useAppStore((state) => state.selectedArea);
-  const showDemoGrid = useAppStore((state) => state.showDemoGrid);
-  const setShowDemoGrid = useAppStore((state) => state.setShowDemoGrid);
+  const nisarLayer = useAppStore((state) => state.nisarLayer);
+  // NISAR permafrost layers belong to the permafrost view only.
+  const permafrostView = useAppStore((state) => state.phenomenon === 'permafrost');
+  const shownNisarLayer: NisarLayer = permafrostView ? nisarLayer : 'none';
+  const setNisarLayer = useAppStore((state) => state.setNisarLayer);
+  // Overlays are drawn only inside the selected circle or rectangle.
+  const [overlayShown, setOverlayShown] = useState(false);
 
   const commitArea = useCallback((shape: SelectedArea['shape'], center: LngLat, ring: LngLat[], areaKm2: number, place?: Place) => {
     const nearby = place ? { place } : nearestPlace(center, 40);
@@ -132,7 +186,7 @@ export function MapPanel({ cells, segments }: MapPanelProps) {
       teardown = initMap(container.current, style);
     });
     return () => teardown();
-  }, [cells, segments]);
+  }, [cells, sites]);
 
   function initMap(element: HTMLDivElement, style: maplibregl.StyleSpecification) {
     let map: maplibregl.Map;
@@ -155,22 +209,64 @@ export function MapPanel({ cells, segments }: MapPanelProps) {
     map.addControl(new maplibregl.ScaleControl({ unit: 'metric', maxWidth: 96 }), 'bottom-right');
 
     map.on('load', () => {
-      map.addSource('demo-cells', { type: 'geojson', data: cells as GeoJSONSourceSpecification['data'] });
-      map.addSource('demo-segments', { type: 'geojson', data: segments as GeoJSONSourceSpecification['data'] });
-      map.addSource('demo-extent', { type: 'geojson', data: ringFeature(boxRing([MVP_BOUNDS.west, MVP_BOUNDS.south], [MVP_BOUNDS.east, MVP_BOUNDS.north])) });
       map.addSource('area', { type: 'geojson', data: EMPTY });
       map.addSource('draft', { type: 'geojson', data: EMPTY });
-      const demoVisibility = useAppStore.getState().showDemoGrid ? 'visible' : 'none';
-      map.addLayer({
-        id: 'demo-cells', type: 'fill', source: 'demo-cells', layout: { visibility: demoVisibility },
-        paint: {
-          'fill-color': ['case', ['boolean', ['get', 'excluded'], false], '#9aa5ab', ['interpolate', ['linear'], ['get', 'motion_cm_yr'], -3.5, '#d93025', -1.4, '#f9ab00', -0.4, '#8ab4f8', 0.2, '#1a73e8']],
-          'fill-opacity': ['case', ['boolean', ['get', 'excluded'], false], 0.2, ['interpolate', ['linear'], ['get', 'q'], 0, 0.25, 1, 0.6]],
-        },
-      } as FillLayerSpecification);
-      map.addLayer({ id: 'demo-pipeline', type: 'line', source: 'demo-segments', filter: ['==', ['get', 'asset'], 'pipeline'], layout: { visibility: demoVisibility }, paint: { 'line-color': '#5f6368', 'line-width': 2, 'line-dasharray': [2, 2] } } as LineLayerSpecification);
-      map.addLayer({ id: 'demo-highway', type: 'line', source: 'demo-segments', filter: ['==', ['get', 'asset'], 'highway'], layout: { visibility: demoVisibility }, paint: { 'line-color': ['match', ['get', 'priority'], 'higher', '#d93025', 'moderate', '#f9ab00', '#34a853'], 'line-width': 3 } } as LineLayerSpecification);
-      map.addLayer({ id: 'demo-extent', type: 'line', source: 'demo-extent', layout: { visibility: demoVisibility }, paint: { 'line-color': '#5f6368', 'line-width': 1.5, 'line-dasharray': [3, 2] } } as LineLayerSpecification);
+      // Outline every processed site. Overlay images are added on first use, inside a selection.
+      if (sites.length) {
+        map.addSource('nisar-footprint', { type: 'geojson', data: { type: 'FeatureCollection', features: sites.map(({ corners }) => ringFeature([...corners, corners[0]])) } });
+        map.addLayer({ id: 'nisar-footprint', type: 'line', source: 'nisar-footprint', paint: { 'line-color': '#1a73e8', 'line-width': 1.5, 'line-dasharray': [3, 2], 'line-opacity': 0.8 } } as LineLayerSpecification);
+      }
+      // Risk hotspots. Computed zones (NISAR sites with ground movement) follow the land; demo
+      // estimates elsewhere are a soft glow on a point, no rings, until NISAR is processed there.
+      const demo = demoHotspots(HOTSPOTS, sites);
+      map.addSource('hotspot-points', { type: 'geojson', data: hotspotPoints(demo) });
+      map.addSource('risk-zones', { type: 'geojson', data: '/data/nisar/risk-zones.geojson' });
+      map.addSource('nisar-hot', { type: 'geojson', data: EMPTY });
+      map.addLayer({ id: 'hotspot-heat', type: 'heatmap', source: 'hotspot-points', paint: {
+        ...HEAT_COLOR,
+        'heatmap-weight': ['get', 'risk'],
+        'heatmap-intensity': 1.6,
+        'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 1, 12, 3, 30, 6, 46, 10, 70],
+        'heatmap-opacity': 0.75,
+      } } as HeatmapLayerSpecification);
+      // Invisible targets so a demo glow can be hovered.
+      map.addLayer({ id: 'hotspot-hit', type: 'circle', source: 'hotspot-points', paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, 8, 6, 20, 10, 30], 'circle-opacity': 0 } });
+      const zoneOnly: maplibregl.FilterSpecification = ['==', ['geometry-type'], 'Polygon'];
+      // Zoom morph for computed sites: one glow like every hotspot (far) → a glow per measured
+      // cell that traces the land (mid) → crisp zone outlines (near).
+      map.addLayer({ id: 'risk-site-heat', type: 'heatmap', source: 'risk-zones', filter: ['==', ['get', 'kind'], 'site'], maxzoom: 7.5, paint: {
+        ...HEAT_COLOR,
+        'heatmap-weight': ['get', 'risk'],
+        'heatmap-intensity': 1.6,
+        'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 1, 12, 3, 30, 6, 46],
+        'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 5, 0.75, 7, 0],
+      } } as HeatmapLayerSpecification);
+      map.addLayer({ id: 'risk-site-hit', type: 'circle', source: 'risk-zones', filter: ['==', ['get', 'kind'], 'site'], maxzoom: 7, paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, 8, 6, 20], 'circle-opacity': 0 } });
+      map.addLayer({ id: 'risk-heat', type: 'heatmap', source: 'risk-zones', filter: ['==', ['get', 'kind'], 'cell'], minzoom: 4.5, maxzoom: 10, paint: {
+        ...HEAT_COLOR,
+        'heatmap-weight': ['get', 'risk'],
+        'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 5, 0.35, 7, 0.7, 9, 1],
+        'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 5, 10, 7, 16, 9, 26],
+        'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 5, 0, 6.5, 0.85, 8.5, 0.55, 10, 0],
+      } } as HeatmapLayerSpecification);
+      map.addLayer({ id: 'risk-glow', type: 'line', source: 'risk-zones', filter: ['all', zoneOnly, ['==', ['get', 'band'], 0]], paint: {
+        'line-color': '#d93025', 'line-width': ['interpolate', ['linear'], ['zoom'], 6, 8, 12, 5], 'line-blur': 5, 'line-opacity': ['interpolate', ['linear'], ['zoom'], 6.5, 0, 8, 0.35],
+      } } as LineLayerSpecification);
+      map.addLayer({ id: 'risk-fill', type: 'fill', source: 'risk-zones', filter: zoneOnly, paint: {
+        'fill-color': ['match', ['get', 'band'], 2, '#a50e0e', '#d93025'],
+        'fill-opacity': ['interpolate', ['linear'], ['zoom'], 6.5, 0, 8.5, ['match', ['get', 'band'], 0, 0.2, 1, 0.3, 0.45]],
+      } } as FillLayerSpecification);
+      map.addLayer({ id: 'risk-line', type: 'line', source: 'risk-zones', filter: zoneOnly, paint: {
+        'line-color': ['match', ['get', 'band'], 2, '#a50e0e', '#d93025'],
+        'line-width': ['match', ['get', 'band'], 0, 1.8, 1, 2, 2.6],
+        'line-opacity': ['interpolate', ['linear'], ['zoom'], 6.5, 0, 8.5, ['match', ['get', 'band'], 0, 0.8, 0.95]],
+      } } as LineLayerSpecification);
+      map.addLayer({ id: 'nisar-hot', type: 'heatmap', source: 'nisar-hot', paint: {
+        ...HEAT_COLOR,
+        'heatmap-weight': ['get', 'weight'],
+        'heatmap-radius': ['interpolate', ['exponential', 2], ['zoom'], 8, 6, 12, 60],
+        'heatmap-opacity': 0.8,
+      } } as HeatmapLayerSpecification);
       map.addLayer({ id: 'area-fill', type: 'fill', source: 'area', paint: { 'fill-color': '#1a73e8', 'fill-opacity': 0.12 } } as FillLayerSpecification);
       map.addLayer({ id: 'area-line', type: 'line', source: 'area', paint: { 'line-color': '#1a73e8', 'line-width': 2.5 } } as LineLayerSpecification);
       map.addLayer({ id: 'draft-fill', type: 'fill', source: 'draft', paint: { 'fill-color': '#1a73e8', 'fill-opacity': 0.08 } } as FillLayerSpecification);
@@ -218,6 +314,32 @@ export function MapPanel({ cells, segments }: MapPanelProps) {
     map.on('touchmove', (event) => moveDraw(event.lngLat));
     map.on('touchend', (event) => endDraw(event.lngLat));
 
+    // Hover descriptions: computed zones (the highest band under the cursor) and demo glows.
+    const tip = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 12, maxWidth: '280px', className: 'zone-popup' });
+    map.on('mousemove', 'risk-fill', (event) => {
+      const top = [...(event.features ?? [])].sort((a, b) => Number(b.properties?.band) - Number(a.properties?.band))[0];
+      if (!top?.properties) return;
+      map.getCanvas().style.cursor = 'pointer';
+      tip.setLngLat(event.lngLat).setHTML(zoneDescription(top.properties)).addTo(map);
+    });
+    map.on('mousemove', 'hotspot-hit', (event) => {
+      if (map.queryRenderedFeatures(event.point, { layers: ['risk-fill'] }).length) return;
+      const spot = HOTSPOTS.find((item) => item.id === event.features?.[0]?.properties?.id);
+      if (!spot) return;
+      map.getCanvas().style.cursor = 'pointer';
+      tip.setLngLat(spot.center).setHTML(demoDescription(spot, riskScore(spot))).addTo(map);
+    });
+    map.on('mousemove', 'risk-site-hit', (event) => {
+      const p = event.features?.[0]?.properties;
+      if (!p) return;
+      map.getCanvas().style.cursor = 'pointer';
+      tip.setLngLat(event.lngLat).setHTML(`<div class="zone-tip"><b>${escapeHtml(String(p.siteLabel))}</b><span>Computed from NISAR</span><p>Peak risk ${Math.round(Number(p.risk) * 100)} / 100. Zoom in to see the danger zones, outlined where measured ground movement meets buildings.</p></div>`).addTo(map);
+    });
+    map.on('mouseleave', 'risk-site-hit', () => { tip.remove(); if (!useAppStore.getState().drawing) map.getCanvas().style.cursor = ''; });
+    const hideTip = () => { tip.remove(); if (!useAppStore.getState().drawing) map.getCanvas().style.cursor = ''; };
+    map.on('mouseleave', 'risk-fill', hideTip);
+    map.on('mouseleave', 'hotspot-hit', hideTip);
+
     map.on('click', (event) => {
       if (justDrew || useAppStore.getState().drawing) return;
       const center: LngLat = [event.lngLat.lng, event.lngLat.lat];
@@ -241,8 +363,55 @@ export function MapPanel({ cells, segments }: MapPanelProps) {
   useEffect(() => {
     const map = mapRef.current;
     if (status !== 'ready' || !map) return;
-    DEMO_LAYERS.forEach((layer) => map.setLayoutProperty(layer, 'visibility', showDemoGrid ? 'visible' : 'none'));
-  }, [showDemoGrid, status]);
+    let cancelled = false;
+    const hideAll = () => (Object.values(NISAR_LAYERS)).forEach((layer) => { if (map.getLayer(layer)) map.setLayoutProperty(layer, 'visibility', 'none'); });
+    if (map.getLayer('nisar-footprint')) map.setLayoutProperty('nisar-footprint', 'visibility', permafrostView ? 'visible' : 'none');
+    const active = shownNisarLayer === 'none' || shownNisarLayer === 'hotspots' ? null : shownNisarLayer;
+    if (!active || !selectedArea || !site || !gcov || (active === 'landcover' && !gcov.landcover) || (active === 'motion' && !gunw) || !ringTouchesFootprint(selectedArea.ring, site.corners)) {
+      hideAll();
+      setOverlayShown(false);
+      return;
+    }
+    // Ground movement has its own footprint (GUNW grid); the radar layers share the GCOV one.
+    const corners = active === 'motion' && gunw ? gunw.corners : site.corners;
+    clipOverlay(siteFile(site, NISAR_FILES[active]), corners, selectedArea.ring).then((url) => {
+      if (cancelled || !map.getStyle()) return;
+      const id = NISAR_LAYERS[active];
+      const source = map.getSource(id) as ImageSource | undefined;
+      if (source) source.updateImage({ url, coordinates: corners });
+      else {
+        map.addSource(id, { type: 'image', url, coordinates: corners });
+        map.addLayer({ id, type: 'raster', source: id, paint: NISAR_PAINT[active] } as RasterLayerSpecification, 'area-fill');
+      }
+      hideAll();
+      map.setLayoutProperty(id, 'visibility', 'visible');
+      setOverlayShown(true);
+    }).catch(() => setOverlayShown(false));
+    return () => { cancelled = true; };
+  }, [shownNisarLayer, permafrostView, selectedArea, status, site, gcov, gunw]);
+
+  // Global hotspots follow the toggle; inside a selection the Hotspots layer always shows them,
+  // plus NISAR-measured danger cells where the area falls in a processed site.
+  const areaHotspots = shownNisarLayer === 'hotspots' && selectedArea !== null;
+  const hotspotsVisible = permafrostView && showHotspots;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (status !== 'ready' || !map) return;
+    HOTSPOT_LAYERS.forEach((id) => map.setLayoutProperty(id, 'visibility', hotspotsVisible ? 'visible' : 'none'));
+    const measured = hotspotsVisible && areaHotspots && site && gcov && selectedArea ? nisarHotspotPoints(gcov, selectedArea.ring) : EMPTY;
+    (map.getSource('nisar-hot') as GeoJSONSource).setData(measured);
+  }, [hotspotsVisible, areaHotspots, selectedArea, site, gcov, status]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (status !== 'ready' || !map || !focusRequest) return;
+    const { center, radiusKm, place } = focusRequest;
+    const ring = circleRing(center, radiusKm);
+    commitRef.current('circle', center, ring, Math.PI * radiusKm ** 2, place);
+    const lngs = ring.map(([lng]) => lng);
+    const lats = ring.map(([, lat]) => lat);
+    map.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], { padding: { top: 90, bottom: 90, left: window.innerWidth > 760 ? 440 : 30, right: 60 }, duration: 1600 });
+  }, [focusRequest, status]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -263,10 +432,14 @@ export function MapPanel({ cells, segments }: MapPanelProps) {
     map.flyTo({ center: place.center, zoom: 8.3, offset: window.innerWidth > 760 ? [200, 0] : [0, -120], duration: 1600, essential: true });
   };
 
-  const showDemoArea = () => {
-    setShowDemoGrid(true);
-    setLayersOpen(false);
-    mapRef.current?.fitBounds([[MVP_BOUNDS.west, MVP_BOUNDS.south], [MVP_BOUNDS.east, MVP_BOUNDS.north]], { padding: { top: 80, bottom: 80, left: window.innerWidth > 760 ? 440 : 40, right: 40 }, duration: 1400 });
+  // Fly to a site and select its centre, so its NISAR results appear straight away.
+  const openSite = (target: NisarSite) => {
+    setSitesOpen(false);
+    const lngs = target.corners.map(([lng]) => lng);
+    const lats = target.corners.map(([, lat]) => lat);
+    const center: LngLat = [lngs.reduce((a, b) => a + b) / lngs.length, lats.reduce((a, b) => a + b) / lats.length];
+    commitRef.current('circle', center, circleRing(center, SITE_SELECT_RADIUS_KM), Math.PI * SITE_SELECT_RADIUS_KM ** 2);
+    mapRef.current?.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], { padding: { top: 90, bottom: 90, left: window.innerWidth > 760 ? 440 : 30, right: 60 }, duration: 1600 });
   };
 
   return (
@@ -281,8 +454,98 @@ export function MapPanel({ cells, segments }: MapPanelProps) {
 
       <div className="map-top-left">
         <MapSearch onPick={flyToPlace} />
-        <button className={`chip ${drawing ? 'active' : ''}`} onClick={() => setDrawing(!drawing)} aria-pressed={drawing}><DrawIcon />Draw area</button>
+        <button className={`chip ${drawing ? 'active' : ''}`} data-tour="draw" onClick={() => setDrawing(!drawing)} aria-pressed={drawing}><DrawIcon />Draw area</button>
+        {permafrostView && (
+          <div className="sites-menu" data-tour="hotspots" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setHotspotMenuOpen(false); }}>
+            <button className={`chip hotspot-chip ${showHotspots ? 'active' : ''}`} onClick={() => setHotspotMenuOpen(!hotspotMenuOpen)} aria-expanded={hotspotMenuOpen}>
+              <HotspotIcon />Permafrost risk hotspots<small>{showHotspots ? 'On' : 'Off'}</small>
+            </button>
+            {hotspotMenuOpen && (
+              <div className="sites-popover hotspot-popover">
+                <label className="hotspot-switch">
+                  <span><b>Show hotspots</b><small>Across the globe and inside your area</small></span>
+                  <input type="checkbox" role="switch" checked={showHotspots} onChange={(event) => setShowHotspots(event.target.checked)} />
+                </label>
+                {PHENOMENON_GROUPS.map((group) => (
+                  <div key={group.id} className="hotspot-group">
+                    <small className="hotspot-group-label">{group.label}</small>
+                    {PHENOMENA.filter((item) => item.group === group.id).map((item) => (
+                      <button key={item.id} className={item.id === 'permafrost' ? 'active' : ''} disabled={!item.available} onClick={() => setShowHotspots(true)}>
+                        <b>{item.label}</b>
+                        <span>{item.available ? 'Risk hotspots ready' : 'Not in this demo'}</span>
+                      </button>
+                    ))}
+                  </div>
+                ))}
+                <p className="sites-note">Where NISAR ground movement is processed, risk is computed and the zones follow the real shape of the land: zoom in and they sharpen into outlines where measured movement meets buildings. Elsewhere, a soft glow marks a hand-built estimate until NISAR is processed there.</p>
+              </div>
+            )}
+          </div>
+        )}
+        {sites.length > 0 && permafrostView && (
+          <div className="sites-menu" data-tour="sites">
+            <button className={`chip ${sitesOpen ? 'active' : ''}`} onClick={() => setSitesOpen(!sitesOpen)} aria-expanded={sitesOpen}><SatelliteIcon />NISAR sites · {sites.length}</button>
+            {sitesOpen && (
+              <div className="sites-popover">
+                {sites.map((item) => (
+                  <button key={item.id} className={site?.id === item.id ? 'active' : ''} onClick={() => openSite(item)}>
+                    <b>{item.label}</b>
+                    <span>{item.passCount} radar passes · {monthRange(item.firstDate, item.lastDate)}</span>
+                  </button>
+                ))}
+                <p className="sites-note">Demo only: we processed a small part of NISAR’s data for these {sites.length} sites. Once fully computed there are no “sites”: every place NISAR surveys, which is nearly all land on Earth, gets the same insights.</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      {gcov && overlayShown && shownNisarLayer !== 'none' && status === 'ready' && (
+        <div className="map-legend">
+          {shownNisarLayer === 'landcover' && gcov.landcover ? (
+            <>
+              <b>Land cover</b>
+              <span>ESA WorldCover 2021 · 10 m</span>
+              <ul className="legend-classes">
+                {Object.entries(gcov.landcover.classes).filter(([code]) => LEGEND_CLASSES.includes(Number(code))).map(([code, entry]) => <li key={code}><i style={{ background: entry.color }} />{entry.label}</li>)}
+              </ul>
+              <small className="legend-note">Permanent water is excluded from permafrost statistics. Built-up areas are kept to show infrastructure at risk.</small>
+            </>
+          ) : shownNisarLayer === 'motion' && gunw ? (
+            <>
+              <b>Ground movement (NISAR GUNW)</b>
+              <span>{gunw.map.first} → {gunw.map.last} · track {gunw.map.track.split('|')[0]}</span>
+              <i className="legend-ramp motion-ramp" />
+              <div className="legend-ends"><span>Away ≥{gunw.map.limit_cm} cm</span><span>Stable</span><span>Toward</span></div>
+              <small className="legend-note">Movement along the radar’s line of sight, relative to the area’s median. Away from the satellite (red) is usually sinking. Ionosphere corrected; provisional.</small>
+            </>
+          ) : shownNisarLayer === 'change' ? (
+            <>
+              <b>Radar brightness change</b>
+              <span>{changePeriods(gcov)}</span>
+              <i className="legend-ramp" />
+              <div className="legend-ends"><span>Darker</span><span>No change</span><span>Brighter</span></div>
+              <small className="legend-note">Darker: possible new standing water or drying. Brighter: wetter soil or more vegetation. Permanent water hidden. NISAR, provisional.</small>
+            </>
+          ) : (
+            <>
+              <b>NISAR radar image</b>
+              <span>{gcov.composite_date} · HH / HV false colour (provisional)</span>
+            </>
+          )}
+        </div>
+      )}
+
+      {hotspotsVisible && !(gcov && overlayShown && shownNisarLayer !== 'none') && status === 'ready' && (
+        <div className="map-legend">
+          <b>Risk hotspots</b>
+          {sites.some((item) => item.risk) && <span className="legend-computed"><i />Computed from NISAR: outlines follow the land</span>}
+          <span>Risk = f(Hazard, Exposure, Vulnerability)</span>
+          <i className="legend-ramp hotspot-ramp" />
+          <div className="legend-ends"><span>Lower</span><span>Likelihood of harm</span><span>Higher</span></div>
+          <small className="legend-note">IPCC climate-risk framework. {sites.some((item) => item.risk) ? 'Elsewhere, a soft glow marks a hand-built estimate until NISAR ground movement is processed there.' : 'Demo: a soft glow marks each hand-built estimate; computed risk will follow the real shape of the land.'}{areaHotspots && site ? ' Small glows inside your area are NISAR-measured radar change near buildings.' : ''}</small>
+        </div>
+      )}
 
       {status === 'ready' && !selectedArea && !drawing && <div className="map-hint">Click anywhere on the map to see permafrost insights</div>}
       {drawing && <div className="map-hint">Click and drag to draw an area <button onClick={() => setDrawing(false)}>Cancel</button></div>}
@@ -300,12 +563,18 @@ export function MapPanel({ cells, segments }: MapPanelProps) {
           <span className={`basemap-thumb ${basemap === 'map' ? 'thumb-satellite' : 'thumb-map'}`} />
           <span className="basemap-label">{basemap === 'map' ? 'Satellite' : 'Map'}</span>
         </button>
-        <div className="layers-menu">
+        <div className="layers-menu" data-tour="layers">
           <button className={`control-button ${layersOpen ? 'active' : ''}`} onClick={() => setLayersOpen(!layersOpen)} aria-expanded={layersOpen} aria-label="Map layers"><LayersIcon /></button>
           {layersOpen && (
             <div className="layers-popover">
-              <label><input type="checkbox" checked={showDemoGrid} onChange={(event) => setShowDemoGrid(event.target.checked)} /><span>Ground-motion demo grid<small>Northern Dalton corridor · synthetic</small></span></label>
-              <button className="link-button" onClick={showDemoArea}>Go to demo area</button>
+              {permafrostView && (
+                <fieldset className="layer-radios">
+                  <legend>Area layer{site ? ` · ${site.label}` : ''}<small>Shown inside the area you select. NISAR radar layers need an outlined NISAR site.</small></legend>
+                  {([['hotspots', 'Risk hotspots & danger zones'], ...(gunw ? [['motion', 'NISAR ground movement (GUNW)']] : []), ...(sites.length ? [['change', 'NISAR summer brightness change'], ['radar', 'NISAR radar image']] : []), ...(sites.length && (!gcov || gcov.landcover) ? [['landcover', 'Land cover (ESA WorldCover)']] : []), ['none', 'Off']] as Array<[NisarLayer, string]>).map(([id, label]) => (
+                    <label key={id}><input type="radio" name="nisar-layer" checked={nisarLayer === id} onChange={() => { setNisarLayer(id); if (id === 'hotspots') setShowHotspots(true); }} /><span>{label}</span></label>
+                  ))}
+                </fieldset>
+              )}
             </div>
           )}
         </div>

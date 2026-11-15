@@ -1,22 +1,45 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { PLACES, type Place } from '../lib/geo';
-import { searchPlaces } from '../lib/geocode';
+import { searchPlaces, suggestPlaces } from '../lib/geocode';
 import { CloseIcon, PinIcon, SearchIcon } from './Icons';
+
+const SUGGEST_DELAY_MS = 250; // wait for a pause in typing before asking Photon
+const SUGGEST_MIN_CHARS = 2;
+const MAX_RESULTS = 6;
 
 export function MapSearch({ onPick }: { onPick: (place: Place) => void }) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
+  // Suggestions are tagged with the text they answer, so stale ones are never shown.
+  const [suggested, setSuggested] = useState<{ term: string; places: Place[] } | null>(null);
   const [remote, setRemote] = useState<Place[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [active, setActive] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
+  const term = query.trim();
 
-  const local = useMemo(() => {
-    const term = query.trim().toLowerCase();
-    if (!term) return PLACES.slice(0, 6);
-    return PLACES.filter((place) => `${place.name} ${place.region}`.toLowerCase().includes(term)).slice(0, 6);
-  }, [query]);
-  const results = remote ?? local;
+  useEffect(() => {
+    if (term.length < SUGGEST_MIN_CHARS) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      suggestPlaces(term, controller.signal)
+        .then((places) => setSuggested({ term, places }))
+        .catch(() => undefined);
+    }, SUGGEST_DELAY_MS);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [term]);
+
+  const results = useMemo(() => {
+    if (remote) return remote;
+    if (!term) return PLACES.slice(0, MAX_RESULTS);
+    const lower = term.toLowerCase();
+    const local = PLACES.filter((place) => `${place.name} ${place.region}`.toLowerCase().includes(lower));
+    const online = suggested?.term === term ? suggested.places : [];
+    // Our permafrost places first, then worldwide suggestions not already listed.
+    const merged = [...local, ...online.filter((place) => !local.some((item) => item.name === place.name && item.region === place.region))];
+    return merged.slice(0, MAX_RESULTS);
+  }, [remote, term, suggested]);
+  const waiting = term.length >= SUGGEST_MIN_CHARS && !remote && suggested?.term !== term;
 
   const pick = (place: Place) => {
     setQuery(place.name);
@@ -25,8 +48,8 @@ export function MapSearch({ onPick }: { onPick: (place: Place) => void }) {
     onPick(place);
   };
 
+  // Enter with nothing suggested falls back to a full Nominatim search.
   const runRemoteSearch = async () => {
-    const term = query.trim();
     if (!term) return;
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -48,8 +71,7 @@ export function MapSearch({ onPick }: { onPick: (place: Place) => void }) {
     <div className="map-search" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false); }}>
       <form className="search-box" role="search" onSubmit={(event) => {
         event.preventDefault();
-        if (remote?.length) pick(remote[active] ?? remote[0]);
-        else if (!remote && local.length && query.trim()) pick(local[active] ?? local[0]);
+        if (term && results.length) pick(results[active] ?? results[0]);
         else void runRemoteSearch();
       }}>
         <SearchIcon className="search-icon" />
@@ -57,6 +79,7 @@ export function MapSearch({ onPick }: { onPick: (place: Place) => void }) {
           value={query}
           placeholder="Search a place"
           aria-label="Search a place"
+          autoComplete="off"
           onFocus={() => setOpen(true)}
           onChange={(event) => { setQuery(event.target.value); setRemote(null); setActive(0); setOpen(true); }}
           onKeyDown={(event) => {
@@ -69,15 +92,16 @@ export function MapSearch({ onPick }: { onPick: (place: Place) => void }) {
       </form>
       {open && (
         <div className="search-results" role="listbox">
-          {!query.trim() && <div className="search-hint">Permafrost places</div>}
+          {!term && <div className="search-hint">Permafrost places</div>}
           {results.map((place, index) => (
             <button key={`${place.name}-${place.center.join()}`} role="option" aria-selected={index === active} className={index === active ? 'active' : ''} onMouseEnter={() => setActive(index)} onClick={() => pick(place)}>
               <PinIcon /><span><b>{place.name}</b><small>{place.region}</small></span>
             </button>
           ))}
-          {searching && <div className="search-hint">Searching…</div>}
-          {!searching && query.trim() && !results.length && <div className="search-hint">{remote ? 'No places found.' : 'Press Enter to search everywhere.'}</div>}
-          {!searching && query.trim() && !remote && results.length > 0 && <button className="search-more" onClick={() => void runRemoteSearch()}><SearchIcon />Search everywhere for “{query.trim()}”</button>}
+          {(searching || (waiting && !results.length)) && <div className="search-hint">Searching…</div>}
+          {!searching && !waiting && term && !results.length && (remote
+            ? <div className="search-hint">No places found.</div>
+            : <button className="search-more" onClick={() => void runRemoteSearch()}><SearchIcon />Search everywhere for “{term}”</button>)}
         </div>
       )}
     </div>

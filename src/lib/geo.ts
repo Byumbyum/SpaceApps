@@ -103,3 +103,13 @@ export function formatArea(km2: number) {
   if (km2 >= 100) return `${Math.round(km2).toLocaleString()} km²`;
   return `${km2.toFixed(1)} km²`;
 }
+
+export function insideRing([x, y]: LngLat, ring: LngLat[]) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}

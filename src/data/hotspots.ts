@@ -1,0 +1,106 @@
+import { ipccVulnerability, type Hotspot } from '../lib/risk';
+
+// INDICATIVE ESTIMATES. Factor values (0–1) are set by hand from published reports
+// on each place: hazard from documented thaw damage, erosion or creep; exposure from
+// population and infrastructure; vulnerability (IPCC: susceptibility and lack of coping
+// capacity) from remoteness and building stock (vulnerability below) and from monitoring
+// and local plans (capacity below), combined by ipccVulnerability. They are labelled "Estimate" wherever
+// shown, and get replaced by NISAR ground-motion trends and open data (OSM, WorldPop)
+// as each site is processed.
+const ESTIMATES: Array<Hotspot & { capacity: number }> = [
+  { id: 'yakutsk', name: 'Yakutsk', region: 'Sakha Republic, Russia', center: [129.73, 62.03], radiusKm: 25, hazard: 0.8, exposure: 0.85, vulnerability: 0.5, capacity: 0.5,
+    hazards: 'City of 350,000 built on piles in ice-rich permafrost; buildings crack as the ground warms.', safety: 'Apartment blocks and pipes deforming', health: 'Burst water and sewage lines', economy: 'Costly foundation repair across the city' },
+  { id: 'norilsk', name: 'Norilsk', region: 'Krasnoyarsk Krai, Russia', center: [88.2, 69.35], radiusKm: 30, hazard: 0.8, exposure: 0.8, vulnerability: 0.55, capacity: 0.4,
+    hazards: 'Industrial city where a fuel tank failed on thawing ground in 2020, spilling about 21,000 t of diesel.', safety: 'Ageing industrial foundations', health: 'Fuel and heavy-metal contamination', economy: 'Mining and smelting assets at risk' },
+  { id: 'vorkuta', name: 'Vorkuta', region: 'Komi Republic, Russia', center: [64.0, 67.5], radiusKm: 20, hazard: 0.7, exposure: 0.6, vulnerability: 0.7, capacity: 0.35,
+    hazards: 'Coal city with many buildings already deformed by thaw.', safety: 'Unsafe housing blocks', health: 'Mine waste and heating failures', economy: 'Shrinking budget for repairs' },
+  { id: 'bovanenkovo', name: 'Bovanenkovo gas field', region: 'Yamal Peninsula, Russia', center: [68.4, 70.4], radiusKm: 40, hazard: 0.8, exposure: 0.7, vulnerability: 0.4, capacity: 0.55,
+    hazards: 'Gas pipelines and rail on ice-rich ground; gas-emission craters nearby.', safety: 'Pipeline and rail-bed failure', health: 'Methane and spill risk', economy: 'Major export infrastructure' },
+  { id: 'salekhard', name: 'Salekhard', region: 'Yamalo-Nenets, Russia', center: [66.6, 66.53], radiusKm: 15, hazard: 0.65, exposure: 0.55, vulnerability: 0.5, capacity: 0.5,
+    hazards: 'Town on the Arctic Circle with settling roads and buildings.', safety: 'Road and building settlement', health: 'Water supply disruption', economy: 'Regional hub repairs' },
+  { id: 'mirny', name: 'Mirny', region: 'Sakha Republic, Russia', center: [113.96, 62.53], radiusKm: 15, hazard: 0.65, exposure: 0.55, vulnerability: 0.5, capacity: 0.45,
+    hazards: 'Diamond-mining town on continuous permafrost.', safety: 'Housing and pit-wall stability', health: 'Tailings and water quality', economy: 'Mining infrastructure' },
+  { id: 'tiksi', name: 'Tiksi', region: 'Sakha Republic, Russia', center: [128.87, 71.64], radiusKm: 10, hazard: 0.75, exposure: 0.35, vulnerability: 0.7, capacity: 0.35,
+    hazards: 'Remote Arctic port where buildings are failing as the ground beneath them thaws.', safety: 'Building failure', health: 'Isolated from hospitals', economy: 'Port and supply line' },
+  { id: 'utqiagvik', name: 'Utqiaġvik (Barrow)', region: 'Alaska, United States', center: [-156.79, 71.29], radiusKm: 15, hazard: 0.75, exposure: 0.55, vulnerability: 0.7, capacity: 0.45,
+    hazards: 'Permafrost thawing under homes, roads and utilities at the northernmost US town.', safety: 'Ground settling under homes', health: 'Water and sewer damage', economy: 'Road and utility repairs' },
+  { id: 'newtok', name: 'Newtok', region: 'Alaska, United States', center: [-164.63, 60.94], radiusKm: 8, hazard: 0.9, exposure: 0.4, vulnerability: 0.9, capacity: 0.3,
+    hazards: 'Village moving to Mertarvik as thawing riverbanks erode toward homes.', safety: 'Homes undercut by erosion', health: 'No safe water or sewage', economy: 'Relocation costs' },
+  { id: 'shishmaref', name: 'Shishmaref', region: 'Alaska, United States', center: [-166.08, 66.26], radiusKm: 8, hazard: 0.85, exposure: 0.4, vulnerability: 0.85, capacity: 0.3,
+    hazards: 'Barrier-island village losing its thawing shoreline to storms.', safety: 'Storm surge and erosion', health: 'Water supply at risk', economy: 'Relocation planning' },
+  { id: 'kivalina', name: 'Kivalina', region: 'Alaska, United States', center: [-164.53, 67.73], radiusKm: 8, hazard: 0.85, exposure: 0.35, vulnerability: 0.85, capacity: 0.3,
+    hazards: 'Low barrier island with thawing, eroding coast.', safety: 'Evacuation routes limited', health: 'Isolated from care', economy: 'Seawall upkeep' },
+  { id: 'bethel', name: 'Bethel', region: 'Alaska, United States', center: [-161.76, 60.79], radiusKm: 15, hazard: 0.7, exposure: 0.55, vulnerability: 0.7, capacity: 0.45,
+    hazards: 'Regional hub where buildings and boardwalks tilt as ground thaws.', safety: 'Tilting buildings', health: 'Regional hospital access', economy: 'Hub for 50 villages' },
+  { id: 'nome', name: 'Nome', region: 'Alaska, United States', center: [-165.41, 64.5], radiusKm: 10, hazard: 0.6, exposure: 0.45, vulnerability: 0.55, capacity: 0.5,
+    hazards: 'Roads and runway settling on warm permafrost.', safety: 'Road and runway damage', health: 'Supply interruptions', economy: 'Port and mining access' },
+  { id: 'dalton-fdl', name: 'Dalton Highway debris lobes', region: 'Alaska, United States', center: [-149.8, 67.9], radiusKm: 15, hazard: 0.75, exposure: 0.5, vulnerability: 0.35, capacity: 0.6,
+    hazards: 'Frozen debris lobes creeping downslope toward the only road to Prudhoe Bay.', safety: 'Highway blocked or buried', health: 'Delayed emergency transport', economy: 'Oil-field supply route' },
+  { id: 'prudhoe', name: 'Prudhoe Bay oil field', region: 'Alaska, United States', center: [-148.4, 70.25], radiusKm: 25, hazard: 0.6, exposure: 0.7, vulnerability: 0.3, capacity: 0.7,
+    hazards: 'Pads, pipelines and roads on ice-rich tundra.', safety: 'Pipeline supports shifting', health: 'Spill risk', economy: 'Trans-Alaska Pipeline source' },
+  { id: 'fairbanks', name: 'Fairbanks', region: 'Alaska, United States', center: [-147.72, 64.84], radiusKm: 20, hazard: 0.55, exposure: 0.75, vulnerability: 0.35, capacity: 0.7,
+    hazards: 'Discontinuous permafrost under homes and roads; thermokarst in suburbs.', safety: 'Sinking homes and roads', health: 'Well and septic damage', economy: 'Property value loss' },
+  { id: 'barry-arm', name: 'Barry Arm', region: 'Alaska, United States', center: [-148.15, 61.15], radiusKm: 8, hazard: 0.8, exposure: 0.45, vulnerability: 0.5, capacity: 0.55,
+    hazards: 'Slope above a retreating glacier is creeping; a collapse could send a tsunami toward Whittier.', safety: 'Landslide-tsunami threat', health: 'Mass-casualty risk for boaters', economy: 'Tourism and fishing traffic' },
+  { id: 'inuvik', name: 'Inuvik', region: 'Northwest Territories, Canada', center: [-133.72, 68.36], radiusKm: 15, hazard: 0.65, exposure: 0.55, vulnerability: 0.55, capacity: 0.55,
+    hazards: 'Town on piles and utilidors; highway embankments slumping.', safety: 'Highway slumps', health: 'Utility corridor damage', economy: 'Supply road upkeep' },
+  { id: 'tuktoyaktuk', name: 'Tuktoyaktuk', region: 'Northwest Territories, Canada', center: [-133.03, 69.44], radiusKm: 10, hazard: 0.85, exposure: 0.4, vulnerability: 0.7, capacity: 0.4,
+    hazards: 'Coastline retreating metres per year as permafrost bluffs thaw.', safety: 'Homes near eroding bluffs', health: 'Cemetery and water threatened', economy: 'Relocation of buildings' },
+  { id: 'dawson', name: 'Dawson City', region: 'Yukon, Canada', center: [-139.43, 64.06], radiusKm: 10, hazard: 0.6, exposure: 0.4, vulnerability: 0.45, capacity: 0.55,
+    hazards: 'Historic buildings heaving and sinking on thawing ground.', safety: 'Building tilt', health: 'Water lines', economy: 'Heritage tourism' },
+  { id: 'yellowknife', name: 'Yellowknife (Giant Mine)', region: 'Northwest Territories, Canada', center: [-114.37, 62.45], radiusKm: 12, hazard: 0.55, exposure: 0.55, vulnerability: 0.35, capacity: 0.65,
+    hazards: 'About 237,000 t of arsenic trioxide kept frozen underground beside the city.', safety: 'Ground settlement', health: 'Arsenic release if thawed', economy: 'Long-term freezing costs' },
+  { id: 'iqaluit', name: 'Iqaluit', region: 'Nunavut, Canada', center: [-68.52, 63.75], radiusKm: 12, hazard: 0.55, exposure: 0.5, vulnerability: 0.55, capacity: 0.5,
+    hazards: 'Runway and roads cracking on thawing ground.', safety: 'Airport damage', health: 'Single air link for care', economy: 'Runway repairs' },
+  { id: 'ilulissat', name: 'Ilulissat', region: 'Greenland', center: [-51.1, 69.22], radiusKm: 10, hazard: 0.5, exposure: 0.45, vulnerability: 0.45, capacity: 0.55,
+    hazards: 'Town on thawing sediment beside the Icefjord.', safety: 'Foundation damage', health: 'Water supply', economy: 'Tourism base' },
+  { id: 'longyearbyen', name: 'Longyearbyen', region: 'Svalbard, Norway', center: [15.63, 78.22], radiusKm: 10, hazard: 0.7, exposure: 0.45, vulnerability: 0.35, capacity: 0.7,
+    hazards: 'Warming permafrost under homes and roads in the world’s northernmost town.', safety: 'Foundations settling under homes', health: 'Seed vault and water', economy: 'Housing replacement' },
+  { id: 'blatten', name: 'Lötschental (Blatten)', region: 'Valais, Switzerland', center: [7.82, 46.42], radiusKm: 6, hazard: 0.85, exposure: 0.4, vulnerability: 0.3, capacity: 0.8,
+    hazards: 'Thawing rock destabilised the slope above Blatten; the village was buried in May 2025 after evacuation.', safety: 'Rock and ice avalanches', health: 'Displacement', economy: 'Village and roads lost' },
+  { id: 'pontresina', name: 'Pontresina', region: 'Graubünden, Switzerland', center: [9.9, 46.49], radiusKm: 5, hazard: 0.6, exposure: 0.45, vulnerability: 0.25, capacity: 0.85,
+    hazards: 'Debris flows from thawing permafrost slopes; protected by dams.', safety: 'Debris flows', health: 'Low', economy: 'Resort protection costs' },
+  { id: 'hohe-tauern', name: 'Grossglockner (Hohe Tauern)', region: 'Carinthia, Austria', center: [12.7, 47.08], radiusKm: 8, hazard: 0.6, exposure: 0.3, vulnerability: 0.25, capacity: 0.8,
+    hazards: 'Rockfall from thawing summits onto alpine routes and huts.', safety: 'Rockfall on climbing routes', health: 'Low', economy: 'Alpine tourism' },
+  { id: 'qinghai-tibet', name: 'Qinghai–Tibet railway (Beiluhe)', region: 'Qinghai, China', center: [92.9, 34.8], radiusKm: 40, hazard: 0.6, exposure: 0.55, vulnerability: 0.45, capacity: 0.65,
+    hazards: 'Railway and highway on warm plateau permafrost; embankments cooled to stay frozen.', safety: 'Track and road deformation', health: 'Remote, high altitude', economy: 'Key Tibet supply line' },
+  // Lower-income mountain and steppe regions: permafrost risk is not only an Arctic problem.
+  { id: 'ulaanbaatar', name: 'Ulaanbaatar ger districts', region: 'Mongolia', center: [106.92, 47.95], radiusKm: 18, hazard: 0.55, exposure: 0.7, vulnerability: 0.75, capacity: 0.35,
+    hazards: 'Discontinuous permafrost is thawing under the capital’s fast-growing informal ger districts.', safety: 'Shallow foundations: walls crack and floors tilt as the ground settles unevenly', health: 'Pit latrines and hand-dug wells on the same thawing ground: sewage can reach drinking water', economy: 'Informal, unplanned homes: no engineering survey before building, little money for repairs' },
+  { id: 'huaraz', name: 'Huaraz (Cordillera Blanca)', region: 'Áncash, Peru', center: [-77.53, -9.53], radiusKm: 15, hazard: 0.8, exposure: 0.7, vulnerability: 0.65, capacity: 0.4,
+    hazards: 'A city of about 120,000 below growing glacial lakes; a Palcacocha outburst killed more than 1,800 people here in 1941.', safety: 'Glacial lake outburst floods', health: 'Mass-casualty risk downstream', economy: 'Water supply and farming' },
+  { id: 'chamoli', name: 'Chamoli (Rishiganga)', region: 'Uttarakhand, India', center: [79.73, 30.4], radiusKm: 12, hazard: 0.8, exposure: 0.5, vulnerability: 0.65, capacity: 0.4,
+    hazards: 'In February 2021 a rock and ice avalanche set off a flood that left more than 200 people dead or missing and destroyed two hydropower plants.', safety: 'Rock-ice avalanches and floods', health: 'Workers at dam sites exposed', economy: 'Hydropower and roads' },
+  { id: 'teesta', name: 'Teesta valley (South Lhonak)', region: 'Sikkim, India', center: [88.55, 27.6], radiusKm: 15, hazard: 0.75, exposure: 0.55, vulnerability: 0.6, capacity: 0.45,
+    hazards: 'An outburst of South Lhonak lake in October 2023 swept down the Teesta, killing dozens and destroying a major dam.', safety: 'Glacial lake outburst floods', health: 'Displacement along the river', economy: 'Dams, bridges and highway' },
+  { id: 'hunza', name: 'Hunza valley', region: 'Gilgit-Baltistan, Pakistan', center: [74.65, 36.32], radiusKm: 15, hazard: 0.75, exposure: 0.5, vulnerability: 0.65, capacity: 0.35,
+    hazards: 'Landslides and surging glaciers, such as Shisper, dam rivers and threaten villages and the Karakoram Highway.', safety: 'Landslide lakes and outburst floods', health: 'Valley cut off from care', economy: 'Karakoram Highway trade route' },
+  { id: 'punakha', name: 'Punakha valley', region: 'Bhutan', center: [89.86, 27.6], radiusKm: 12, hazard: 0.65, exposure: 0.5, vulnerability: 0.55, capacity: 0.55,
+    hazards: 'Downstream of the Lunana glacial lakes, whose 1994 outburst flooded the valley; early-warning sirens have since been installed.', safety: 'Glacial lake outburst floods', health: 'Low-lying towns exposed', economy: 'Farmland and the historic dzong' },
+  { id: 'almaty', name: 'Almaty foothills', region: 'Kazakhstan', center: [76.95, 43.15], radiusKm: 15, hazard: 0.6, exposure: 0.75, vulnerability: 0.4, capacity: 0.65,
+    hazards: 'Debris flows from thawing moraines and glacial lakes in the Ile Alatau above a city of two million; protected by the Medeu dam.', safety: 'Debris flows', health: 'Dense population downstream', economy: 'City and resort infrastructure' },
+  { id: 'ala-archa', name: 'Ala-Archa valley', region: 'Chüy, Kyrgyzstan', center: [74.53, 42.55], radiusKm: 12, hazard: 0.55, exposure: 0.55, vulnerability: 0.55, capacity: 0.45,
+    hazards: 'Rock glaciers and moraine lakes above the valley that drains toward Bishkek’s southern suburbs; mudflows are a recurring threat.', safety: 'Mudflows and debris flows', health: 'Visitors and villages downstream', economy: 'Tourism and water supply' },
+  { id: 'khorog', name: 'Khorog and Barsem', region: 'Gorno-Badakhshan, Tajikistan', center: [71.6, 37.55], radiusKm: 12, hazard: 0.75, exposure: 0.55, vulnerability: 0.75, capacity: 0.3,
+    hazards: 'In July 2015 debris flows from the mountains above Barsem buried homes and dammed the Gunt river near Khorog, the regional capital.', safety: 'Debris flows and river damming', health: 'Remote, limited care', economy: 'Pamir Highway and power supply' },
+  { id: 'gyirong', name: 'Gyirong', region: 'Tibet, China', center: [85.33, 28.4], radiusKm: 12, hazard: 0.6, exposure: 0.45, vulnerability: 0.6, capacity: 0.4,
+    hazards: 'Mountain border town below thawing slopes and glacial lakes.', safety: 'Landslides and debris flows', health: 'Remote care', economy: 'Trade route to Nepal' },
+];
+
+// Which climate phenomenon each researched place belongs to. Permafrost thaw here means the
+// local effect: ground thawing under the people and infrastructure standing on it. Coastal
+// erosion, slope creep and downstream cascades are their own phenomena (coming soon).
+const OTHER_PHENOMENA: Record<string, string> = {
+  newtok: 'coastal-erosion', shishmaref: 'coastal-erosion', kivalina: 'coastal-erosion', tuktoyaktuk: 'coastal-erosion',
+  'dalton-fdl': 'landslides', 'barry-arm': 'landslides',
+  blatten: 'thaw-cascades', pontresina: 'thaw-cascades', 'hohe-tauern': 'thaw-cascades', huaraz: 'thaw-cascades',
+  chamoli: 'thaw-cascades', teesta: 'thaw-cascades', hunza: 'thaw-cascades', punakha: 'thaw-cascades',
+  almaty: 'thaw-cascades', 'ala-archa': 'thaw-cascades', khorog: 'thaw-cascades', gyirong: 'thaw-cascades',
+};
+const phenomenonOf = (id: string) => OTHER_PHENOMENA[id] ?? 'permafrost';
+
+/** Places researched for a phenomenon that is not live yet (shown on its "coming soon" card). */
+export const researchedPlaces = (phenomenon: string) => ESTIMATES.filter((spot) => phenomenonOf(spot.id) === phenomenon).map((spot) => spot.name);
+
+/** Permafrost-thaw hotspots (local effects), the ones scored on the map. */
+export const HOTSPOTS: Hotspot[] = ESTIMATES.filter((spot) => phenomenonOf(spot.id) === 'permafrost').map(({ vulnerability, capacity, ...spot }) => ({ ...spot, vulnerability: ipccVulnerability(vulnerability, capacity) }));

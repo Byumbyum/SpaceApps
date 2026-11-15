@@ -1,11 +1,12 @@
 import { useMemo } from 'react';
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { formatArea, formatCoordinate } from '../lib/geo';
+import { Area, AreaChart, CartesianGrid, ReferenceArea, ReferenceLine, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from 'recharts';
+import { describeChange, summarizeGcov } from '../lib/gcov';
+import { formatArea, formatCoordinate, insideRing } from '../lib/geo';
 import { placeholderPermafrost } from '../lib/placeholderInsights';
 import { useAppStore } from '../store';
-import type { TimePoint } from '../types';
-import { LevelPill } from './AreaInsights';
-import { CloseIcon, CoinIcon, HeartIcon, ShieldIcon, SnowIcon } from './Icons';
+import type { GcovData, RiskData, TimePoint } from '../types';
+import { LandcoverList, LevelPill } from './AreaInsights';
+import { CloseIcon, CoinIcon, HeartIcon, SatelliteIcon, ShieldIcon, SnowIcon } from './Icons';
 import { TimeSeriesPanel } from './TimeSeriesPanel';
 
 const sections = [
@@ -14,12 +15,47 @@ const sections = [
   { key: 'economy', label: 'Economy', Icon: CoinIcon },
 ] as const;
 
-export function InsightsDrawer({ series }: { series: TimePoint[] }) {
+const dayOf = (date: string) => Date.parse(`${date}T00:00:00Z`);
+const shortDate = (value: number) => new Date(value).toLocaleDateString('en', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+
+const median = (values: number[]) => { if (!values.length) return null; const sorted = [...values].sort((a, b) => a - b); return sorted[sorted.length >> 1]; };
+const signed = (value: number, digits = 1) => `${value > 0 ? '+' : ''}${value.toFixed(digits)}`;
+
+/** Old trend (Sentinel-1, 2016–2025) and new trend (NISAR, 2026 onwards) over the selected cells. */
+function TrendCard({ risk, ring }: { risk: RiskData; ring: Array<[number, number]> }) {
+  const cells = risk.cells.filter((cell) => insideRing(cell.center, ring));
+  if (!cells.length) return null;
+  const rates = cells.map((cell) => cell.trendCmYr).filter((value): value is number => typeof value === 'number');
+  const oldTrend = median(rates);
+  const newSeason = median(cells.map((cell) => cell.movement));
+  const permafrost = median(cells.map((cell) => cell.p ?? 0));
+  return (
+    <section className="drawer-card">
+      <div className="drawer-card-title"><span className="impact-icon impact-permafrost"><SnowIcon /></span><h3>Ground movement: old and new trend</h3></div>
+      <dl className="metric-list">
+        <div><dt>Old trend · Sentinel-1, 2016–2025</dt><dd>{oldTrend === null ? (risk.trendSource ? 'No data here' : 'No Sentinel-1 product here') : `${signed(oldTrend, 2)} cm/yr`}</dd></div>
+        <div><dt>New trend · NISAR, 2026 onwards</dt><dd>Season 1 of ~3</dd></div>
+        <div><dt>NISAR this summer (thaw sinking)</dt><dd>{newSeason === null ? '—' : `${signed(newSeason)} cm`}</dd></div>
+        <div><dt>Permafrost (ESA CCI)</dt><dd>{permafrost === null ? '—' : `${Math.round(permafrost * 100)}%`}</dd></div>
+        <div><dt>Cells</dt><dd>{cells.length} × 1 km²</dd></div>
+      </dl>
+      <ul className="card-bullets">
+        <li>Old trend: net sinking that does not recover, year after year. The danger signal.</li>
+        <li>New trend: NISAR builds its own record from 2026, every 12 days, worldwide. It needs about 3 summers to separate a trend from the yearly cycle.</li>
+        <li>Until then, NISAR's summer sinking shows how much ice the ground holds.</li>
+        <li>Negative = sinking, relative to the surrounding area.</li>
+      </ul>
+    </section>
+  );
+}
+
+export function InsightsDrawer({ series, gcov = null, risk = null }: { series: TimePoint[]; gcov?: GcovData | null; risk?: RiskData | null }) {
   const open = useAppStore((state) => state.analysisOpen);
   const setOpen = useAppStore((state) => state.setAnalysisOpen);
   const area = useAppStore((state) => state.selectedArea);
   const demoCellCount = useAppStore((state) => state.selectedCellIds.length);
   const insight = useMemo(() => (area ? placeholderPermafrost(area.center) : null), [area]);
+  const nisar = useMemo(() => (area && gcov ? summarizeGcov(gcov, area.ring, area.center) : null), [area, gcov]);
 
   return (
     <aside className={`insights-drawer ${open && area ? 'open' : ''}`} aria-label="Detailed insights" aria-hidden={!open || !area}>
@@ -33,9 +69,44 @@ export function InsightsDrawer({ series }: { series: TimePoint[] }) {
             <button className="icon-button" onClick={() => setOpen(false)} aria-label="Close detailed insights"><CloseIcon /></button>
           </header>
           <div className="drawer-body">
-            <div className="sample-banner">Sample data. These numbers are placeholders until NISAR and OPERA products are processed.</div>
+            {nisar && gcov && (
+              <section className="drawer-card">
+                <div className="drawer-card-title"><span className="impact-icon impact-permafrost"><SatelliteIcon /></span><h3>NISAR radar observations</h3><span className="provisional-chip">Provisional</span></div>
+                <p className="card-caption">Radar brightness at each pass, relative to the average for that viewing angle (dB). No acquisitions fall in the 27 Jul–10 Aug gap.</p>
+                <div className="chart-box">
+                  <ResponsiveContainer width="100%" height={190}>
+                    <ScatterChart margin={{ top: 8, right: 8, bottom: 0, left: -24 }}>
+                      <CartesianGrid stroke="#eceff1" vertical={false} />
+                      <XAxis dataKey="t" type="number" domain={['dataMin - 86400000', 'dataMax + 86400000']} tickFormatter={shortDate} tick={{ fill: '#5f6368', fontSize: 11 }} tickLine={false} axisLine={{ stroke: '#dadce0' }} />
+                      <YAxis dataKey="anomalyDb" type="number" tick={{ fill: '#5f6368', fontSize: 11 }} tickLine={false} axisLine={false} />
+                      <ReferenceArea x1={dayOf(gcov.gap[0])} x2={dayOf(gcov.gap[1])} fill="#d93025" fillOpacity={0.08} />
+                      <ReferenceLine y={0} stroke="#dadce0" />
+                      <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #dadce0', fontSize: 12 }} formatter={(value, name) => (name === 'anomalyDb' ? [`${value} dB`, 'Brightness'] : [shortDate(Number(value)), 'Date'])} />
+                      <Scatter data={nisar.series.map((point) => ({ ...point, t: dayOf(point.date) }))} fill="#1a73e8" />
+                    </ScatterChart>
+                  </ResponsiveContainer>
+                </div>
+                <dl className="metric-list">
+                  <div><dt>Summer brightness change</dt><dd>{nisar.changeDb === null ? '—' : `${nisar.changeDb > 0 ? '+' : ''}${nisar.changeDb.toFixed(2)} dB`}</dd></div>
+                  <div><dt>Likely open water, early → late</dt><dd>{nisar.waterEarlyPct === null ? '—' : `${nisar.waterEarlyPct.toFixed(1)}% → ${(nisar.waterLatePct ?? 0).toFixed(1)}%`}</dd></div>
+                  <div><dt>Passes · viewing angles</dt><dd>{nisar.passCount} · {nisar.trackCount}</dd></div>
+                  <div><dt>Dates</dt><dd>{nisar.firstDate} → {nisar.lastDate}</dd></div>
+                  <div><dt>Area analysed</dt><dd>{nisar.cellCount} × 1 km² cells</dd></div>
+                </dl>
+                {nisar.landcover.length > 0 && (
+                  <>
+                    <h4 className="card-subtitle">Change by land cover <small>share · change</small></h4>
+                    <LandcoverList items={nisar.landcover} />
+                    <p className="card-caption">If every land type shifts by a similar amount, a regional cause such as rain is likely. A change confined to one type (for example only wetland or only built-up ground) is more worth investigating. Permanent water is excluded.</p>
+                  </>
+                )}
+                <p className="card-caption">{describeChange(nisar.changeDb)}. Rain, vegetation growth and surface roughness also change brightness, so this flags places to check, not confirmed thaw. Ground sinking needs NISAR GUNW data.</p>
+              </section>
+            )}
+            {risk && <TrendCard risk={risk} ring={area.ring} />}
+            <div className="sample-banner">{nisar ? 'The cards below use sample values until ground-motion and exposure data are processed.' : 'Sample data. These numbers are placeholders until NISAR and OPERA products are processed for this area.'}</div>
 
-            <section className="drawer-card">
+            {!risk && <section className="drawer-card">
               <div className="drawer-card-title"><span className="impact-icon impact-permafrost"><SnowIcon /></span><h3>Permafrost thaw</h3><LevelPill level={insight.level} /></div>
               <p className="card-caption">Cumulative ground sinking since 2016 (cm)</p>
               <div className="chart-box">
@@ -61,7 +132,7 @@ export function InsightsDrawer({ series }: { series: TimePoint[] }) {
                 <div><dt>Thaw depth change</dt><dd>+{insight.activeLayerChangeCm} cm / decade</dd></div>
                 <div><dt>Mean ground temperature</dt><dd>{insight.groundTempC}°C</dd></div>
               </dl>
-            </section>
+            </section>}
 
             {sections.map(({ key, label, Icon }) => (
               <section className="drawer-card" key={key}>
@@ -80,7 +151,7 @@ export function InsightsDrawer({ series }: { series: TimePoint[] }) {
               <dl className="metric-list">
                 <div><dt>Centre</dt><dd>{formatCoordinate(area.center)}</dd></div>
                 <div><dt>Size</dt><dd>{formatArea(area.areaKm2)}</dd></div>
-                <div><dt>Planned sources</dt><dd>NISAR, Sentinel-1 / OPERA, ERA5-Land</dd></div>
+                <div><dt>Planned sources</dt><dd>NISAR, Sentinel-1 / OPERA, ESA CCI Permafrost, ERA5-Land</dd></div>
               </dl>
             </section>
           </div>
