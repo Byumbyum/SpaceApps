@@ -26,7 +26,7 @@ describe('area insights panel', () => {
     fireEvent.click(screen.getByRole('button', { name: /Climate phenomenon/ }));
     fireEvent.click(screen.getByRole('button', { name: /Forest loss trends/ }));
     expect(useAppStore.getState().phenomenon).toBe('deforestation');
-    expect(screen.getByText(/not part of this NASA Space Apps demo/i)).toBeTruthy();
+    expect(screen.getByText(/coming soon/i)).toBeTruthy();
   });
 
   it('ranks mapped risk hotspots in the area with their IPCC factors', () => {

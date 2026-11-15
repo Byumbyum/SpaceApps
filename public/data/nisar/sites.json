@@ -31,6 +31,37 @@
     "risk": true
   },
   {
+    "id": "nome",
+    "label": "Nome, Alaska",
+    "base": "/data/nisar/nome",
+    "corners": [
+      [
+        -165.51,
+        64.38415
+      ],
+      [
+        -165.75268,
+        64.56099
+      ],
+      [
+        -165.33961,
+        64.66562
+      ],
+      [
+        -165.09888,
+        64.48797
+      ]
+    ],
+    "firstDate": "2026-06-18",
+    "lastDate": "2026-09-27",
+    "passCount": 31,
+    "changeTracks": 4,
+    "note": null,
+    "gunw": true,
+    "climate": true,
+    "risk": true
+  },
+  {
     "id": "barry-arm",
     "label": "Barry Arm, Alaska",
     "base": "/data/nisar/barry-arm",

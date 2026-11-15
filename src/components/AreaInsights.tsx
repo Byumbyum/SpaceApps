@@ -4,7 +4,7 @@ import { touchesLand } from '../lib/land';
 import { describeChange, summarizeGcov, type GcovSummary } from '../lib/gcov';
 import { summarizeGunw, TEMPERATURE_OFFSET_PCT, type GunwSummary } from '../lib/gunw';
 import type { ClimateData, GcovData, GunwData, NisarSite, RiskData } from '../types';
-import { HOTSPOTS } from '../data/hotspots';
+import { HOTSPOTS, hotspotsFor } from '../data/hotspots';
 import { PHENOMENA, PHENOMENON_GROUPS } from '../lib/phenomena';
 import { areaRisk, demoHotspots, hotspotsInArea, riskLevel, type AreaRisk, type Hotspot } from '../lib/risk';
 import { placeholderPermafrost, type ImpactInsight, type Level } from '../lib/placeholderInsights';
@@ -269,7 +269,9 @@ export function AreaInsights({ gcov = null, gunw = null, climate = null, risk = 
         {!active.available ? (
           <div className="panel-coming-soon">
             <h3>{active.label}</h3>
-            <p>Not part of this NASA Space Apps demo.</p>
+            {area && hotspotsInArea(hotspotsFor(active.id), area.ring, area.center).length > 0
+              ? <HotspotBlock items={hotspotsInArea(hotspotsFor(active.id), area.ring, area.center)} />
+              : <p>{hotspotsFor(active.id).length ? 'Not part of this NASA Space Apps demo. Select one of the glowing researched places to see its estimate.' : 'Insights for this phenomenon are coming soon.'}</p>}
             <button className="text-link" onClick={() => setPhenomenon('permafrost')}>Back to permafrost thaw</button>
           </div>
         ) : !onLand ? (
@@ -338,7 +340,7 @@ export function AreaInsights({ gcov = null, gunw = null, climate = null, risk = 
                 <div className="phenomena-grid">
                   {PHENOMENA.filter((item) => item.group === group.id).map((item) => (
                     <button key={item.id} className={`chip ${item.id === phenomenon ? 'active' : ''}`} onClick={() => { setPhenomenon(item.id); if (!item.available) setAnalysisOpen(false); }} aria-pressed={item.id === phenomenon}>
-                      {item.label}
+                      {item.label}{!item.available && !hotspotsFor(item.id).length && <small>Soon</small>}
                     </button>
                   ))}
                 </div>
