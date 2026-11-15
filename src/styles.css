@@ -448,3 +448,82 @@ p { margin: 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* Header: tutorial pill (sits where the demo-data badge was) */
+.tutorial-pill { justify-self: end; display: inline-flex; align-items: center; gap: .45rem; height: 30px; padding: 0 .9rem; border: 0; border-radius: 999px; background: #f3e8fd; color: #7627bb; font-size: .8rem; font-weight: 500; transition: background .15s, box-shadow .15s; }
+.tutorial-pill:hover { background: #ead6fb; }
+.tutorial-pill.active { background: var(--violet); color: white; box-shadow: var(--shadow-1); }
+.tutorial-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+/* Story placeholder */
+.story-blank { display: grid; place-items: center; }
+.save-world-button { display: inline-flex; align-items: center; gap: .6rem; height: 56px; padding: 0 1.8rem; border: 0; border-radius: 999px; background: var(--ink); color: white; font-size: 1.05rem; font-weight: 500; box-shadow: var(--shadow-2); transition: transform .2s, background .2s; }
+.save-world-button:hover { background: #000; transform: translateY(-1px); }
+.save-world-button svg { width: 20px; height: 20px; }
+
+/* Risk hotspots */
+.chip.hotspot-chip.active { background: var(--red-soft); color: #a50e0e; }
+.chip.hotspot-chip.active svg { color: var(--red); }
+.hotspot-ramp { background: linear-gradient(90deg, rgba(234,67,53,.05), rgba(244,143,130,.5), rgba(234,67,53,.75), #b01814); }
+.hotspot-block { margin: .5rem 0 .75rem; padding: 1rem 1rem .9rem; border-radius: 16px; background: var(--red-soft); }
+.hotspot-block .nisar-title { color: #a50e0e; }
+.hotspot-block .sample-tag { background: white; }
+.hotspot-block .hero-metric { padding: .6rem 0 .5rem; border-bottom: 0; }
+.hotspot-block .hero-metric strong { font-size: 2.2rem; }
+.hotspot-block .metric-label { color: var(--ink); font-weight: 500; }
+.hotspot-why { margin: 0 0 .7rem; font-size: .84rem; color: #5f2120; }
+.factor-bars { list-style: none; margin: 0 0 .7rem; padding: 0; display: grid; gap: .35rem; }
+.factor-bars li { display: grid; grid-template-columns: 92px 1fr; align-items: center; gap: .6rem; font-size: .78rem; color: var(--muted); }
+.factor-bars i { height: 6px; border-radius: 3px; background: rgba(217,48,37,.15); overflow: hidden; }
+.factor-bars i b { display: block; height: 100%; border-radius: 3px; background: var(--red); }
+.factor-bars i b.good { background: var(--green); }
+.hotspot-threats { list-style: none; margin: 0; padding: .6rem 0 0; border-top: 1px solid rgba(217,48,37,.15); display: grid; gap: .3rem; }
+.hotspot-threats li { display: flex; gap: .5rem; align-items: center; font-size: .82rem; }
+.hotspot-threats svg { width: 16px; height: 16px; flex: none; color: #a50e0e; }
+.hotspot-block .nisar-note { margin: .6rem 0 0; }
+
+/* Climate phenomena: predict vs measure */
+.phenomena-groups { display: grid; gap: .4rem; padding-top: .2rem; }
+.phenomena-group h4 { margin: 0; padding: .35rem .65rem 0; font-size: .78rem; font-weight: 500; color: var(--ink); }
+.phenomena-group h4 small { display: block; color: var(--dim); font-size: .72rem; font-weight: 400; }
+
+/* Tutorial */
+.tour { position: fixed; inset: 0; z-index: 1000; cursor: pointer; }
+.tour-spot { position: fixed; border-radius: 16px; box-shadow: 0 0 0 200vmax rgba(14,18,24,.66); outline: 2px solid rgba(255,255,255,.85); outline-offset: 0; transition: left .4s cubic-bezier(.2,0,0,1), top .4s cubic-bezier(.2,0,0,1), width .4s cubic-bezier(.2,0,0,1), height .4s cubic-bezier(.2,0,0,1); pointer-events: none; }
+.tour-spot-none { outline: 0; }
+.tour-card { position: fixed; padding: 1.25rem 1.3rem 1rem; border-radius: 20px; background: var(--surface); box-shadow: 0 12px 40px rgba(0,0,0,.28); cursor: default; animation: tour-in .3s cubic-bezier(.2,0,0,1); transition: left .4s cubic-bezier(.2,0,0,1), top .4s cubic-bezier(.2,0,0,1); }
+@keyframes tour-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.tour-step { color: var(--violet); font-size: .72rem; font-weight: 600; letter-spacing: .06em; }
+.tour-card h2 { margin: .2rem 0 .5rem; font-size: 1.2rem; font-weight: 500; }
+.tour-body { color: var(--muted); font-size: .9rem; }
+.tour-body p { margin: 0 0 .6rem; }
+.tour-body kbd { display: inline-block; min-width: 1.5em; padding: 0 .35em; border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: 5px; background: var(--surface-2); color: var(--ink); font: 500 .75rem var(--font); text-align: center; }
+.tour-formula { margin: .1rem 0 .7rem; padding: .7rem .8rem; border-radius: 12px; background: var(--red-soft); color: #a50e0e; font-weight: 500; font-size: .92rem; text-align: center; }
+.tour-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
+.tour-list li { font-size: .84rem; line-height: 1.4; }
+.tour-list b { display: block; color: var(--ink); font-weight: 500; font-size: .86rem; }
+.tour-muted { color: var(--dim); font-size: .82rem; }
+.tour-progress { display: flex; gap: 4px; margin: 1rem 0 .8rem; }
+.tour-progress i { flex: 1; height: 3px; border-radius: 2px; background: var(--line); transition: background .25s; }
+.tour-progress i.done { background: #d7aefb; }
+.tour-progress i.active { background: var(--violet); }
+.tour-actions { display: flex; align-items: center; gap: .4rem; }
+.tour-actions > span { flex: 1; }
+.tour-actions button { height: 36px; padding: 0 1rem; border: 0; border-radius: 999px; font-weight: 500; font-size: .86rem; }
+.tour-skip { background: none; color: var(--dim); padding: 0 .4rem !important; }
+.tour-skip:hover { color: var(--ink); }
+.tour-back { background: var(--surface-3); color: var(--ink); }
+.tour-back:hover { background: var(--line); }
+.tour-next { background: var(--violet); color: white; }
+.tour-next:hover { background: #7c22c9; }
+@media (prefers-reduced-motion: reduce) { .tour-spot, .tour-card { transition: none; animation: none; } }
+
+/* Header "More" menu: Tutorial and About */
+.more-menu { justify-self: end; position: relative; }
+.more-menu .tutorial-pill svg { width: 16px; height: 16px; transition: transform .2s; }
+.more-popover { position: absolute; right: 0; top: 40px; width: 230px; padding: .4rem; border-radius: 14px; background: var(--surface); box-shadow: var(--shadow-2); display: grid; gap: .15rem; animation: fade .15s ease; }
+.more-popover button { display: grid; gap: .05rem; padding: .55rem .7rem; border: 0; border-radius: 10px; background: none; text-align: left; }
+.more-popover button:hover { background: var(--surface-2); }
+.more-popover button.active { background: #f3e8fd; }
+.more-popover b { font-weight: 500; font-size: .88rem; color: var(--ink); }
+.more-popover span { font-size: .76rem; color: var(--muted); }

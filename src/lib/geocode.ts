@@ -40,10 +40,12 @@ export async function searchPlaces(query: string, signal?: AbortSignal): Promise
 // Restricted to settlements, regions and landforms so shops and stations don't crowd results.
 const PHOTON = 'https://photon.komoot.io/api/';
 const suggestionCache = new Map<string, Place[]>();
+// Tiny settlements sharing a famous name (Singapore, Michigan: a ghost town) go below bigger places.
+const TINY = new Set(['hamlet', 'isolated_dwelling', 'farm', 'locality', 'neighbourhood', 'quarter', 'suburb', 'allotments', 'plot']);
 
 interface PhotonFeature {
   geometry: { coordinates: [number, number] };
-  properties: { name?: string; state?: string; country?: string; county?: string };
+  properties: { name?: string; state?: string; country?: string; county?: string; osm_value?: string };
 }
 
 export async function suggestPlaces(query: string, signal?: AbortSignal): Promise<Place[]> {
@@ -60,15 +62,22 @@ export async function suggestPlaces(query: string, signal?: AbortSignal): Promis
     .filter((feature) => feature.properties.name)
     .map(({ geometry, properties }) => {
       const name = properties.name!;
-      const region = [properties.state ?? properties.county, properties.country].filter((part) => part && part !== name).join(', ');
-      return { name, region, center: geometry.coordinates as LngLat };
+      const kind = (properties.osm_value ?? '').replace(/_/g, ' ');
+      const tiny = TINY.has(properties.osm_value ?? '');
+      const where = [properties.state ?? properties.county, properties.country].filter((part) => part && part !== name).join(', ');
+      // Name the kind of place when it would otherwise be blank ("Singapore · Country") or easy to mistake.
+      const region = !where ? kind.charAt(0).toUpperCase() + kind.slice(1) : tiny ? `${where} · ${kind}` : where;
+      return { name, region, where, center: geometry.coordinates as LngLat, tiny };
     })
+    .sort((a, b) => Number(a.tiny) - Number(b.tiny))
     .filter((place) => {
-      const id = `${place.name}|${place.region}`;
+      // Country, city and island of Singapore share a name and location: keep the first, largest one.
+      const id = `${place.name}|${place.where}`;
       if (seen.has(id)) return false;
       seen.add(id);
       return true;
-    });
+    })
+    .map(({ name, region, center }) => ({ name, region, center }));
   suggestionCache.set(key, places);
   return places;
 }

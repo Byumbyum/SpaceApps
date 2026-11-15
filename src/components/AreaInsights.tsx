@@ -2,10 +2,12 @@ import { useMemo, useState } from 'react';
 import { formatArea } from '../lib/geo';
 import { describeChange, summarizeGcov, type GcovSummary } from '../lib/gcov';
 import type { GcovData } from '../types';
-import { PHENOMENA } from '../lib/phenomena';
+import { HOTSPOTS } from '../data/hotspots';
+import { PHENOMENA, PHENOMENON_GROUPS } from '../lib/phenomena';
+import { hotspotsInArea, riskLevel, type Hotspot } from '../lib/risk';
 import { placeholderPermafrost, type ImpactInsight, type Level } from '../lib/placeholderInsights';
 import { useAppStore } from '../store';
-import { ArrowRightIcon, ChevronIcon, CloseIcon, CoinIcon, HeartIcon, SatelliteIcon, ShieldIcon } from './Icons';
+import { ArrowRightIcon, ChevronIcon, CloseIcon, CoinIcon, HeartIcon, HotspotIcon, SatelliteIcon, ShieldIcon } from './Icons';
 
 export function LevelPill({ level }: { level: Level }) {
   return <span className={`level level-${level.toLowerCase()}`}>{level}</span>;
@@ -53,6 +55,44 @@ export function NisarBlock({ summary, gcov }: { summary: GcovSummary; gcov: Gcov
   );
 }
 
+const FACTORS: Array<{ key: 'hazard' | 'exposure' | 'vulnerability' | 'capacity'; label: string }> = [
+  { key: 'hazard', label: 'Hazard' },
+  { key: 'exposure', label: 'Exposure' },
+  { key: 'vulnerability', label: 'Vulnerability' },
+  { key: 'capacity', label: 'Capacity' },
+];
+
+export function HotspotBlock({ items }: { items: Array<{ spot: Hotspot; score: number }> }) {
+  const [{ spot, score }, ...others] = items;
+  return (
+    <div className="hotspot-block">
+      <div className="nisar-title"><HotspotIcon /><b>Risk hotspot</b><span className="sample-tag">Estimate</span></div>
+      <div className="hero-metric">
+        <div>
+          <span className="metric-label">{spot.name}</span>
+          <strong>{Math.round(score * 100)}<small> / 100 risk</small></strong>
+        </div>
+        <LevelPill level={riskLevel(score)} />
+      </div>
+      <p className="hotspot-why">{spot.hazards}</p>
+      <ul className="factor-bars" aria-label="Risk factors">
+        {FACTORS.map(({ key, label }) => (
+          <li key={key}>
+            <span>{label}</span>
+            <i><b style={{ width: `${spot[key] * 100}%` }} className={key === 'capacity' ? 'good' : ''} /></i>
+          </li>
+        ))}
+      </ul>
+      <ul className="hotspot-threats">
+        <li><ShieldIcon /><span>{spot.safety}</span></li>
+        <li><HeartIcon /><span>{spot.health}</span></li>
+        <li><CoinIcon /><span>{spot.economy}</span></li>
+      </ul>
+      {others.length > 0 && <p className="nisar-note">Also in this area: {others.map(({ spot: other, score: value }) => `${other.name} (${riskLevel(value).toLowerCase()})`).join(', ')}.</p>}
+    </div>
+  );
+}
+
 export function AreaInsights({ gcov = null }: { gcov?: GcovData | null }) {
   const area = useAppStore((state) => state.selectedArea);
   const setSelectedArea = useAppStore((state) => state.setSelectedArea);
@@ -62,9 +102,12 @@ export function AreaInsights({ gcov = null }: { gcov?: GcovData | null }) {
   const [othersOpen, setOthersOpen] = useState(false);
   const insight = useMemo(() => (area ? placeholderPermafrost(area.center) : null), [area]);
   const nisar = useMemo(() => (area && gcov ? summarizeGcov(gcov, area.ring, area.center) : null), [area, gcov]);
+  const hotspots = useMemo(() => (area ? hotspotsInArea(HOTSPOTS, area.ring, area.center) : []), [area]);
 
   if (!area || !insight) return null;
   const active = PHENOMENA.find((item) => item.id === phenomenon) ?? PHENOMENA[0];
+  // Mountain permafrost sits outside the coarse latitude model, so mapped hotspots and NISAR sites count too.
+  const hasPermafrost = insight.hasPermafrost || hotspots.length > 0 || nisar !== null;
 
   return (
     <section className="insights-panel" aria-label={`Insights for ${area.name}`}>
@@ -83,13 +126,14 @@ export function AreaInsights({ gcov = null }: { gcov?: GcovData | null }) {
             <p>Insights for {active.label.toLowerCase()} are coming soon.</p>
             <button className="text-link" onClick={() => setPhenomenon('permafrost')}>Back to permafrost thaw</button>
           </div>
-        ) : !insight.hasPermafrost ? (
+        ) : !hasPermafrost ? (
           <div className="panel-coming-soon">
             <h3>Little or no permafrost here</h3>
             <p>This area is outside the main permafrost zones. Try somewhere in the Arctic, like northern Alaska or Siberia.</p>
           </div>
         ) : (
           <>
+            {hotspots.length > 0 && <HotspotBlock items={hotspots} />}
             {nisar && gcov && <NisarBlock summary={nisar} gcov={gcov} />}
             <div className="hero-metric">
               <div>
@@ -121,7 +165,7 @@ export function AreaInsights({ gcov = null }: { gcov?: GcovData | null }) {
             <button className="primary-action" onClick={() => setAnalysisOpen(true)}>View detailed insights <ArrowRightIcon /></button>
           </>
         )}
-        {active.available && insight.hasPermafrost && <p className="sample-note">{nisar ? 'Values tagged Sample are placeholders until ground-motion (GUNW) data is processed.' : 'Sample values for layout only. Real NISAR data covers the sites outlined on the map.'}</p>}
+        {active.available && hasPermafrost && <p className="sample-note">{nisar ? 'Values tagged Sample are placeholders until ground-motion (GUNW) data is processed.' : 'Sample values for layout only. Real NISAR data covers the sites outlined on the map.'}</p>}
       </div>
 
       <footer className="phenomena">
@@ -130,11 +174,18 @@ export function AreaInsights({ gcov = null }: { gcov?: GcovData | null }) {
           <ChevronIcon style={{ transform: othersOpen ? 'rotate(180deg)' : undefined }} />
         </button>
         {othersOpen && (
-          <div className="phenomena-grid">
-            {PHENOMENA.map((item) => (
-              <button key={item.id} className={`chip ${item.id === phenomenon ? 'active' : ''}`} onClick={() => { setPhenomenon(item.id); if (!item.available) setAnalysisOpen(false); }} aria-pressed={item.id === phenomenon}>
-                {item.label}{!item.available && <small>Soon</small>}
-              </button>
+          <div className="phenomena-groups">
+            {PHENOMENON_GROUPS.map((group) => (
+              <section key={group.id} className="phenomena-group">
+                <h4>{group.label}<small>{group.hint}</small></h4>
+                <div className="phenomena-grid">
+                  {PHENOMENA.filter((item) => item.group === group.id).map((item) => (
+                    <button key={item.id} className={`chip ${item.id === phenomenon ? 'active' : ''}`} onClick={() => { setPhenomenon(item.id); if (!item.available) setAnalysisOpen(false); }} aria-pressed={item.id === phenomenon}>
+                      {item.label}{!item.available && <small>Soon</small>}
+                    </button>
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
         )}

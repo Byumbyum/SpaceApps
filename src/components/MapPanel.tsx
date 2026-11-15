@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as maplibregl from 'maplibre-gl';
-import type { FillLayerSpecification, GeoJSONSource, ImageSource, LineLayerSpecification, RasterLayerSpecification } from 'maplibre-gl';
+import type { FillLayerSpecification, GeoJSONSource, HeatmapLayerSpecification, ImageSource, LineLayerSpecification, RasterLayerSpecification } from 'maplibre-gl';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
+import { HOTSPOTS } from '../data/hotspots';
 import { BASEMAPS, INITIAL_VIEW, VECTOR_STYLE_URL, type BasemapId } from '../config/map';
 import { boxAreaKm2, boxRing, circleRing, formatCoordinate, insideRing, nearestPlace, type LngLat, type Place, type SelectedArea } from '../lib/geo';
 import { reverseGeocode } from '../lib/geocode';
 import { siteFile } from '../lib/nisarSites';
+import { hotspotFeatures, hotspotPoints, nisarHotspotPoints } from '../lib/risk';
 import { clipOverlay, ringTouchesFootprint } from '../lib/overlayClip';
 import { useAppStore, type NisarLayer } from '../store';
 import type { DemoCellProperties, GcovData, NisarSite } from '../types';
-import { CompassIcon, DrawIcon, LayersIcon, MinusIcon, PlusIcon, SatelliteIcon } from './Icons';
+import { CompassIcon, DrawIcon, HotspotIcon, LayersIcon, MinusIcon, PlusIcon, SatelliteIcon } from './Icons';
 import { MapSearch } from './MapSearch';
 
 // MapLibre locates its worker relative to its own module, which breaks once Vite
@@ -28,9 +30,10 @@ interface MapPanelProps {
   gcov: GcovData | null;
 }
 
-const NISAR_LAYERS: Record<Exclude<NisarLayer, 'none'>, string> = { radar: 'nisar-radar', change: 'nisar-change', landcover: 'nisar-landcover' };
-const NISAR_FILES: Record<Exclude<NisarLayer, 'none'>, string> = { radar: 'gcov-composite.png', change: 'gcov-change.png', landcover: 'landcover.png' };
-const NISAR_PAINT: Record<Exclude<NisarLayer, 'none'>, RasterLayerSpecification['paint']> = {
+type RasterLayer = Exclude<NisarLayer, 'none' | 'hotspots'>;
+const NISAR_LAYERS: Record<RasterLayer, string> = { radar: 'nisar-radar', change: 'nisar-change', landcover: 'nisar-landcover' };
+const NISAR_FILES: Record<RasterLayer, string> = { radar: 'gcov-composite.png', change: 'gcov-change.png', landcover: 'landcover.png' };
+const NISAR_PAINT: Record<RasterLayer, RasterLayerSpecification['paint']> = {
   radar: { 'raster-opacity': 0.9, 'raster-fade-duration': 0 },
   change: { 'raster-opacity': 0.85, 'raster-fade-duration': 0 },
   landcover: { 'raster-opacity': 0.8, 'raster-fade-duration': 0, 'raster-resampling': 'nearest' },
@@ -39,6 +42,11 @@ const SITE_SELECT_RADIUS_KM = 8;
 const SELECT_RADIUS_PX = 70;
 const LEGEND_CLASSES = [10, 20, 30, 50, 60, 90, 100, 80];
 const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
+const HOTSPOT_LAYERS = ['hotspot-heat', 'hotspot-fill', 'hotspot-line'];
+// Transparent to deep red: the halo reads as a likelihood of harm, densest at the core.
+const HEAT_COLOR: HeatmapLayerSpecification['paint'] = {
+  'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'], 0, 'rgba(234,67,53,0)', 0.25, 'rgba(244,143,130,0.35)', 0.55, 'rgba(234,67,53,0.6)', 1, 'rgba(176,24,20,0.85)'],
+};
 
 // Vector layers hidden in satellite mode; roads, boundaries and labels stay on top of the imagery.
 const HIDDEN_IN_SATELLITE = new Set(['fill', 'fill-extrusion', 'raster', 'hillshade']);
@@ -104,7 +112,11 @@ export function MapPanel({ cells, sites, site, gcov }: MapPanelProps) {
   const geocodeAbort = useRef<AbortController | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [bearing, setBearing] = useState(0);
-  const [layersOpen, setLayersOpen] = useState(false);
+  const layersOpen = useAppStore((state) => state.layersOpen);
+  const setLayersOpen = useAppStore((state) => state.setLayersOpen);
+  const showHotspots = useAppStore((state) => state.showHotspots);
+  const setShowHotspots = useAppStore((state) => state.setShowHotspots);
+  const focusRequest = useAppStore((state) => state.focusRequest);
   const [sitesOpen, setSitesOpen] = useState(false);
   const basemap = useAppStore((state) => state.basemap);
   const setBasemap = useAppStore((state) => state.setBasemap);
@@ -186,6 +198,31 @@ export function MapPanel({ cells, sites, site, gcov }: MapPanelProps) {
         map.addSource('nisar-footprint', { type: 'geojson', data: { type: 'FeatureCollection', features: sites.map(({ corners }) => ringFeature([...corners, corners[0]])) } });
         map.addLayer({ id: 'nisar-footprint', type: 'line', source: 'nisar-footprint', paint: { 'line-color': '#1a73e8', 'line-width': 1.5, 'line-dasharray': [3, 2], 'line-opacity': 0.8 } } as LineLayerSpecification);
       }
+      // Risk hotspots: a heatmap glow at globe scale that hands over to ringed danger zones.
+      map.addSource('hotspot-points', { type: 'geojson', data: hotspotPoints(HOTSPOTS) });
+      map.addSource('hotspot-zones', { type: 'geojson', data: hotspotFeatures(HOTSPOTS) });
+      map.addSource('nisar-hot', { type: 'geojson', data: EMPTY });
+      map.addLayer({ id: 'hotspot-heat', type: 'heatmap', source: 'hotspot-points', maxzoom: 7, paint: {
+        ...HEAT_COLOR,
+        'heatmap-weight': ['get', 'risk'],
+        'heatmap-intensity': 1.2,
+        'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 1, 9, 3, 20, 6, 46],
+        'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 4.5, 0.9, 6.5, 0],
+      } } as HeatmapLayerSpecification);
+      map.addLayer({ id: 'hotspot-fill', type: 'fill', source: 'hotspot-zones', paint: {
+        'fill-color': '#d93025',
+        'fill-opacity': ['interpolate', ['linear'], ['zoom'], 4, 0, 5.5, ['*', ['get', 'risk'], ['match', ['get', 'ring'], 0, 0.3, 1, 0.17, 0.08]]],
+      } } as FillLayerSpecification);
+      map.addLayer({ id: 'hotspot-line', type: 'line', source: 'hotspot-zones', filter: ['==', ['get', 'ring'], 2], paint: {
+        'line-color': '#d93025', 'line-width': 1.6, 'line-blur': 0.6,
+        'line-opacity': ['interpolate', ['linear'], ['zoom'], 4, 0, 5.5, 0.6],
+      } } as LineLayerSpecification);
+      map.addLayer({ id: 'nisar-hot', type: 'heatmap', source: 'nisar-hot', paint: {
+        ...HEAT_COLOR,
+        'heatmap-weight': ['get', 'weight'],
+        'heatmap-radius': ['interpolate', ['exponential', 2], ['zoom'], 8, 6, 12, 60],
+        'heatmap-opacity': 0.8,
+      } } as HeatmapLayerSpecification);
       map.addLayer({ id: 'area-fill', type: 'fill', source: 'area', paint: { 'fill-color': '#1a73e8', 'fill-opacity': 0.12 } } as FillLayerSpecification);
       map.addLayer({ id: 'area-line', type: 'line', source: 'area', paint: { 'line-color': '#1a73e8', 'line-width': 2.5 } } as LineLayerSpecification);
       map.addLayer({ id: 'draft-fill', type: 'fill', source: 'draft', paint: { 'fill-color': '#1a73e8', 'fill-opacity': 0.08 } } as FillLayerSpecification);
@@ -259,7 +296,7 @@ export function MapPanel({ cells, sites, site, gcov }: MapPanelProps) {
     let cancelled = false;
     const hideAll = () => (Object.values(NISAR_LAYERS)).forEach((layer) => { if (map.getLayer(layer)) map.setLayoutProperty(layer, 'visibility', 'none'); });
     if (map.getLayer('nisar-footprint')) map.setLayoutProperty('nisar-footprint', 'visibility', permafrostView ? 'visible' : 'none');
-    const active = shownNisarLayer === 'none' ? null : shownNisarLayer;
+    const active = shownNisarLayer === 'none' || shownNisarLayer === 'hotspots' ? null : shownNisarLayer;
     if (!active || !selectedArea || !site || !gcov || (active === 'landcover' && !gcov.landcover) || !ringTouchesFootprint(selectedArea.ring, site.corners)) {
       hideAll();
       setOverlayShown(false);
@@ -280,6 +317,29 @@ export function MapPanel({ cells, sites, site, gcov }: MapPanelProps) {
     }).catch(() => setOverlayShown(false));
     return () => { cancelled = true; };
   }, [shownNisarLayer, permafrostView, selectedArea, status, site, gcov]);
+
+  // Global hotspots follow the toggle; inside a selection the Hotspots layer always shows them,
+  // plus NISAR-measured danger cells where the area falls in a processed site.
+  const areaHotspots = shownNisarLayer === 'hotspots' && selectedArea !== null;
+  const hotspotsVisible = permafrostView && (showHotspots || areaHotspots);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (status !== 'ready' || !map) return;
+    HOTSPOT_LAYERS.forEach((id) => map.setLayoutProperty(id, 'visibility', hotspotsVisible ? 'visible' : 'none'));
+    const measured = areaHotspots && site && gcov && selectedArea ? nisarHotspotPoints(gcov, selectedArea.ring) : EMPTY;
+    (map.getSource('nisar-hot') as GeoJSONSource).setData(measured);
+  }, [hotspotsVisible, areaHotspots, selectedArea, site, gcov, status]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (status !== 'ready' || !map || !focusRequest) return;
+    const { center, radiusKm, place } = focusRequest;
+    const ring = circleRing(center, radiusKm);
+    commitRef.current('circle', center, ring, Math.PI * radiusKm ** 2, place);
+    const lngs = ring.map(([lng]) => lng);
+    const lats = ring.map(([, lat]) => lat);
+    map.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], { padding: { top: 90, bottom: 90, left: window.innerWidth > 760 ? 440 : 30, right: 60 }, duration: 1600 });
+  }, [focusRequest, status]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -322,9 +382,10 @@ export function MapPanel({ cells, sites, site, gcov }: MapPanelProps) {
 
       <div className="map-top-left">
         <MapSearch onPick={flyToPlace} />
-        <button className={`chip ${drawing ? 'active' : ''}`} onClick={() => setDrawing(!drawing)} aria-pressed={drawing}><DrawIcon />Draw area</button>
+        <button className={`chip ${drawing ? 'active' : ''}`} data-tour="draw" onClick={() => setDrawing(!drawing)} aria-pressed={drawing}><DrawIcon />Draw area</button>
+        {permafrostView && <button className={`chip hotspot-chip ${showHotspots ? 'active' : ''}`} data-tour="hotspots" onClick={() => setShowHotspots(!showHotspots)} aria-pressed={showHotspots}><HotspotIcon />Risk hotspots<small>{showHotspots ? 'On' : 'Off'}</small></button>}
         {sites.length > 0 && permafrostView && (
-          <div className="sites-menu">
+          <div className="sites-menu" data-tour="sites">
             <button className={`chip ${sitesOpen ? 'active' : ''}`} onClick={() => setSitesOpen(!sitesOpen)} aria-expanded={sitesOpen}><SatelliteIcon />NISAR sites · {sites.length}</button>
             {sitesOpen && (
               <div className="sites-popover">
@@ -368,6 +429,16 @@ export function MapPanel({ cells, sites, site, gcov }: MapPanelProps) {
         </div>
       )}
 
+      {hotspotsVisible && !(gcov && overlayShown && shownNisarLayer !== 'none') && status === 'ready' && (
+        <div className="map-legend">
+          <b>Risk hotspots</b>
+          <span>Risk = f(Hazard, Exposure, Vulnerability, Capacity)</span>
+          <i className="legend-ramp hotspot-ramp" />
+          <div className="legend-ends"><span>Lower</span><span>Likelihood of harm</span><span>Higher</span></div>
+          <small className="legend-note">UNDRR and IPCC risk framework. Factor values are indicative estimates until NISAR ground-motion trends are processed.{areaHotspots && site ? ' Small glows inside your area are NISAR-measured radar change near buildings.' : ''}</small>
+        </div>
+      )}
+
       {status === 'ready' && !selectedArea && !drawing && <div className="map-hint">Click anywhere on the map to see permafrost insights</div>}
       {drawing && <div className="map-hint">Click and drag to draw an area <button onClick={() => setDrawing(false)}>Cancel</button></div>}
 
@@ -384,14 +455,14 @@ export function MapPanel({ cells, sites, site, gcov }: MapPanelProps) {
           <span className={`basemap-thumb ${basemap === 'map' ? 'thumb-satellite' : 'thumb-map'}`} />
           <span className="basemap-label">{basemap === 'map' ? 'Satellite' : 'Map'}</span>
         </button>
-        <div className="layers-menu">
+        <div className="layers-menu" data-tour="layers">
           <button className={`control-button ${layersOpen ? 'active' : ''}`} onClick={() => setLayersOpen(!layersOpen)} aria-expanded={layersOpen} aria-label="Map layers"><LayersIcon /></button>
           {layersOpen && (
             <div className="layers-popover">
-              {sites.length > 0 && permafrostView && (
+              {permafrostView && (
                 <fieldset className="layer-radios">
-                  <legend>NISAR radar{site ? ` · ${site.label}` : ''}<small>Shown inside the area you select, within an outlined NISAR site</small></legend>
-                  {([['change', 'Summer brightness change'], ['radar', 'Radar image'], ...(!gcov || gcov.landcover ? [['landcover', 'Land cover (ESA WorldCover)']] : []), ['none', 'Off']] as Array<[NisarLayer, string]>).map(([id, label]) => (
+                  <legend>Area layer{site ? ` · ${site.label}` : ''}<small>Shown inside the area you select. NISAR radar layers need an outlined NISAR site.</small></legend>
+                  {([['hotspots', 'Risk hotspots & danger zones'], ...(sites.length ? [['change', 'NISAR summer brightness change'], ['radar', 'NISAR radar image']] : []), ...(sites.length && (!gcov || gcov.landcover) ? [['landcover', 'Land cover (ESA WorldCover)']] : []), ['none', 'Off']] as Array<[NisarLayer, string]>).map(([id, label]) => (
                     <label key={id}><input type="radio" name="nisar-layer" checked={nisarLayer === id} onChange={() => setNisarLayer(id)} /><span>{label}</span></label>
                   ))}
                 </fieldset>

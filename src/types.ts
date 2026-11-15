@@ -2,7 +2,7 @@ export type EvidenceKind = 'OBSERVED' | 'INFERRED' | 'PUBLISHED';
 export type IndexKey = 'Q' | 'E';
 export type IndexBand = 'high' | 'medium' | 'low' | 'not-assessed';
 export type ToolMode = 'navigate' | 'select' | 'deselect';
-export type AppMode = 'story' | 'explore' | 'about';
+export type AppMode = 'story' | 'explore' | 'tutorial' | 'about';
 
 export interface FactorConfig {
   id: string;

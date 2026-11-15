@@ -1,10 +1,13 @@
 import { create } from 'zustand';
 import type { AppMode, ToolMode } from './types';
 import type { BasemapId } from './config/map';
-import type { SelectedArea } from './lib/geo';
+import type { LngLat, Place, SelectedArea } from './lib/geo';
 
 export type LayerId = 'motion' | 'quality' | 'interpretation';
-export type NisarLayer = 'none' | 'radar' | 'change' | 'landcover';
+export type NisarLayer = 'none' | 'hotspots' | 'radar' | 'change' | 'landcover';
+
+/** Ask the map to select a circle and fly to it (used by the tutorial). */
+export interface FocusRequest { key: number; center: LngLat; radiusKm: number; place?: Place }
 
 interface AppState {
   mode: AppMode;
@@ -25,6 +28,9 @@ interface AppState {
   phenomenon: string;
   showDemoGrid: boolean;
   nisarLayer: NisarLayer;
+  showHotspots: boolean;
+  layersOpen: boolean;
+  focusRequest: FocusRequest | null;
   setMode: (mode: AppMode) => void;
   setActiveChapter: (chapter: number) => void;
   setTool: (tool: ToolMode) => void;
@@ -46,10 +52,13 @@ interface AppState {
   setPhenomenon: (id: string) => void;
   setShowDemoGrid: (show: boolean) => void;
   setNisarLayer: (layer: NisarLayer) => void;
+  setShowHotspots: (show: boolean) => void;
+  setLayersOpen: (open: boolean) => void;
+  requestFocus: (center: LngLat, radiusKm: number, place?: Place) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
-  mode: 'explore',
+  mode: 'story',
   activeChapter: 0,
   tool: 'navigate',
   brushSize: 34,
@@ -66,7 +75,10 @@ export const useAppStore = create<AppState>((set) => ({
   selectedArea: null,
   phenomenon: 'permafrost',
   showDemoGrid: false,
-  nisarLayer: 'change',
+  nisarLayer: 'hotspots',
+  showHotspots: true,
+  layersOpen: false,
+  focusRequest: null,
   setMode: (mode) => set({ mode }),
   setActiveChapter: (activeChapter) => set({ activeChapter }),
   setTool: (tool) => set({ tool }),
@@ -94,4 +106,7 @@ export const useAppStore = create<AppState>((set) => ({
   setPhenomenon: (phenomenon) => set({ phenomenon }),
   setShowDemoGrid: (showDemoGrid) => set({ showDemoGrid }),
   setNisarLayer: (nisarLayer) => set({ nisarLayer }),
+  setShowHotspots: (showHotspots) => set({ showHotspots }),
+  setLayersOpen: (layersOpen) => set({ layersOpen }),
+  requestFocus: (center, radiusKm, place) => set({ focusRequest: { key: Date.now(), center, radiusKm, place } }),
 }));

@@ -129,3 +129,11 @@ Completed after the real-map overlay:
 - "NISAR sites · N" chip lists sites; choosing one flies there and selects an 8 km circle at its centre.
 - Insights show caveats: mountain-site note from `scripts/sites.mjs`, and a warning when the change map rests on fewer than 2 viewing angles.
 - Harmony jobs are submitted as form POST (GET with 30+ granule ids returned 500). `--job=<id>` reattaches to a running job.
+
+## Risk hotspots, tutorial and page restructure (2026-11-15)
+- Risk = f(Hazard, Exposure, Vulnerability, Capacity) per UNDRR/IPCC (`src/lib/risk.ts`): equal-weight geometric mean of H, E, V, 1−C.
+- `src/data/hotspots.ts`: 29 hand-set INDICATIVE hotspots (labelled "Estimate"); replace factors with NISAR trends + OSM/WorldPop later.
+- Map: global heatmap glow (zoom < 6.5) handing over to 3-ring red halos; "Risk hotspots" on/off chip; area layer defaults to hotspots; inside NISAR sites, measured cells (radar change × built-up share) glow too.
+- Climate phenomena split into "What we can predict" / "What we can measure" (from nisar-risk-predict-users.md).
+- Pages: Story (index, placeholder button) · Map · purple Tutorial pill → spotlight tour over the map (`Tutorial.tsx`). Old Story/About/DemoBanner moved to `recycle/src-pages/`.
+- Search: tiny places (hamlets etc.) ranked below bigger ones; blank regions show the place type.
